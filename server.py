@@ -1312,6 +1312,7 @@ ul { padding-left: 16px; }
                placeholder="e.g.  is EAI up?  /  restart cans  /  check all on sit"
                autocomplete="off" />
         <button id="send-btn" onclick="sendMsg()">Send</button>
+        <button id="abort-btn" onclick="abortRequest()" style="display:none; background:#f85149; color:#fff; border:none; border-radius:4px; padding:7px 14px; cursor:pointer; font-family:inherit; font-size:13px; font-weight:bold;">&#215; Abort</button>
       </div>
     </div>
   </div>
@@ -1338,6 +1339,7 @@ ul { padding-left: 16px; }
 var currentEnv = '030';
 var SERVERS    = {};
 var busy       = false;
+var currentAbortController = null;
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 fetch('/api/envs')
@@ -1421,12 +1423,12 @@ function refreshDash(){
       document.getElementById('last-updated').textContent =
         'Updated: ' + new Date().toLocaleTimeString();
       btn.innerHTML = '&#8635; Refresh';
-      btn.disabled  = false;
+      btn.disabled  = busy;
     })
     .catch(function(e){
       tbody.innerHTML = '<tr><td colspan="4" style="color:#f85149">Error: ' + e + '</td></tr>';
       btn.innerHTML = '&#8635; Refresh';
-      btn.disabled  = false;
+      btn.disabled  = busy;
     });
 }
 
@@ -1435,6 +1437,7 @@ setInterval(refreshDash, 15000);
 
 // ── Quick actions from dashboard buttons ──────────────────────────────────────
 function quickAction(intent, service, envKey){
+  if(busy) return;
   var payload = '__action__:' + intent + ':' + service + ':' + envKey;
   userMsg(intent.charAt(0).toUpperCase() + intent.slice(1) + ' ' + service + ' [' + envLabel(envKey) + ']');
   postChat(payload, envKey);
@@ -1442,6 +1445,7 @@ function quickAction(intent, service, envKey){
 
 // ── Chat ──────────────────────────────────────────────────────────────────────
 function sendMsg(){
+  if(busy) return;
   var input = document.getElementById('msg-input');
   var text  = input.value.trim();
   if(!text) return;
@@ -1451,8 +1455,21 @@ function sendMsg(){
 }
 
 function sendQuick(text){
+  if(busy) return;
   userMsg(text);
   postChat(text, currentEnv);
+}
+
+function abortRequest(){
+  if (currentAbortController) {
+    currentAbortController.abort();
+    currentAbortController = null;
+  }
+  chatQueue = [];
+  processingQueue = false;
+  botMsg('&#9888; <span style="color:#f85149">Command execution cancelled by user.</span>');
+  setBusy(false);
+  refreshDash();
 }
 
 var chatQueue = [];
@@ -1476,13 +1493,16 @@ function processChatQueue(){
   var next = chatQueue.shift();
   var thinking = botMsg('<span class="spinning">&#8635;</span> thinking...', true);
   
+  currentAbortController = new AbortController();
   fetch('/api/chat', {
     method:  'POST',
     headers: {'Content-Type': 'application/json'},
-    body:    JSON.stringify({message: next.text, env: next.env})
+    body:    JSON.stringify({message: next.text, env: next.env}),
+    signal:  currentAbortController.signal
   })
   .then(function(r){ return r.json(); })
   .then(function(data){
+    currentAbortController = null;
     thinking.remove();
     renderResponse(data);
     
@@ -1493,7 +1513,9 @@ function processChatQueue(){
     processChatQueue();
   })
   .catch(function(e){
+    currentAbortController = null;
     thinking.remove();
+    if(e.name === 'AbortError') return;
     botMsg('&#10060; Error: ' + e);
     processingQueue = false;
     processChatQueue();
@@ -1511,6 +1533,7 @@ function renderResponse(data){
         btn.className = 'opt-btn';
         btn.textContent = opt.label;
         btn.onclick = function(){
+          if(busy) return;
           optRow.remove();
           userMsg(opt.label);
           postChat(opt.value, currentEnv);
@@ -1551,10 +1574,34 @@ function botMsg(html, thinking){
 
 function msgs(){ return document.getElementById('messages'); }
 function scrollBottom(){ var m = msgs(); m.scrollTop = m.scrollHeight; }
+
 function setBusy(b){
   busy = b;
-  document.getElementById('send-btn').disabled  = b;
-  document.getElementById('msg-input').disabled = b;
+  var input = document.getElementById('msg-input');
+  var sendBtn = document.getElementById('send-btn');
+  var abortBtn = document.getElementById('abort-btn');
+  
+  if (input) {
+    input.disabled = b;
+    input.placeholder = b ? 'Executing command... Click Abort to cancel' : 'e.g.  is EAI up?  /  restart cans  /  check all on sit';
+  }
+  if (sendBtn) {
+    sendBtn.disabled = b;
+  }
+  if (abortBtn) {
+    abortBtn.style.display = b ? 'inline-block' : 'none';
+  }
+  
+  // Visually grey out and disable all interactive elements
+  var selectors = ['.env-btn', '.qbtn', '.action-cell button', '#refresh-btn', '.opt-btn'];
+  selectors.forEach(function(sel){
+    document.querySelectorAll(sel).forEach(function(el){
+      el.disabled = b;
+      el.style.opacity = b ? '0.3' : '1';
+      el.style.pointerEvents = b ? 'none' : 'auto';
+      el.style.cursor = b ? 'not-allowed' : 'pointer';
+    });
+  });
 }
 
 // ── Enter key ─────────────────────────────────────────────────────────────────
