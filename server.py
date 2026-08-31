@@ -1426,6 +1426,7 @@ setInterval(refreshDash, 60000);
 
 // ── Quick actions from dashboard buttons ──────────────────────────────────────
 function quickAction(intent, service, envKey){
+  if(busy) return;
   var payload = '__action__:' + intent + ':' + service + ':' + envKey;
   userMsg(intent.charAt(0).toUpperCase() + intent.slice(1) + ' ' + service + ' [' + envLabel(envKey) + ']');
   postChat(payload, envKey);
@@ -1527,6 +1528,35 @@ function setBusy(b){
   busy = b;
   document.getElementById('send-btn').disabled  = b;
   document.getElementById('msg-input').disabled = b;
+  
+  // Disable/enable dashboard action buttons
+  document.querySelectorAll('.action-cell button').forEach(function(btn){
+    btn.disabled = b;
+    btn.style.opacity = b ? '0.4' : '1';
+    btn.style.cursor = b ? 'default' : 'pointer';
+  });
+  
+  // Disable/enable quick buttons
+  document.querySelectorAll('.qbtn').forEach(function(btn){
+    btn.disabled = b;
+    btn.style.opacity = b ? '0.4' : '1';
+    btn.style.cursor = b ? 'default' : 'pointer';
+  });
+
+  // Disable/enable env buttons
+  document.querySelectorAll('.env-btn').forEach(function(btn){
+    btn.disabled = b;
+    btn.style.opacity = b ? '0.4' : '1';
+    btn.style.cursor = b ? 'default' : 'pointer';
+  });
+  
+  // Disable/enable refresh button
+  var ref = document.getElementById('refresh-btn');
+  if(ref) {
+    ref.disabled = b;
+    ref.style.opacity = b ? '0.4' : '1';
+    ref.style.cursor = b ? 'default' : 'pointer';
+  }
 }
 
 // ── Enter key ─────────────────────────────────────────────────────────────────
