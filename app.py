@@ -132,27 +132,75 @@ def _run_remote(host, user, cmd, password=None):
     Run a shell command on a remote host via the system ssh binary.
     """
     if password:
-        ssh_cmd = 'sshpass -p "{password}" ssh -o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=no {user}@{host} "{cmd}"'.format(
-            password=password.replace('"', '\\"'), user=user, host=host, cmd=cmd.replace('"', '\\"')
-        )
+        # Zero-installation interactive SSH password login using pty (stdlib only)
+        import pty
+        import select
+        
+        ssh_cmd = ['ssh', '-o', 'BatchMode=no', '-o', 'ConnectTimeout=10', 
+                   '-o', 'StrictHostKeyChecking=no', '{0}@{1}'.format(user, host), cmd]
+        try:
+            pid, fd = pty.fork()
+            if pid == 0:
+                os.execvp('ssh', ssh_cmd)
+                
+            output = []
+            password_sent = False
+            t0 = time.time()
+            while True:
+                if time.time() - t0 > 30:
+                    try:
+                        os.kill(pid, 9)
+                    except OSError:
+                        pass
+                    return '', 'SSH connection timed out (30s)', 1
+                
+                r, _, _ = select.select([fd], [], [], 0.5)
+                if fd in r:
+                    try:
+                        data = os.read(fd, 1024)
+                    except OSError:
+                        break
+                    if not data:
+                        break
+                    decoded = data.decode('utf-8', errors='replace')
+                    output.append(decoded)
+                    
+                    if not password_sent and ('password:' in decoded.lower() or 'password :' in decoded.lower()):
+                        os.write(fd, (password + '\n').encode('utf-8'))
+                        password_sent = True
+            try:
+                _, status = os.waitpid(pid, 0)
+                rc = os.WEXITSTATUS(status) if os.WIFEXITED(status) else 1
+            except OSError:
+                rc = 0
+                
+            full_out = ''.join(output)
+            clean_lines = []
+            for line in full_out.splitlines():
+                if 'password:' in line.lower() or password in line:
+                    continue
+                clean_lines.append(line)
+            return '\n'.join(clean_lines), '', rc
+        except Exception as exc:
+            return '', 'PTY SSH Error: ' + str(exc), 1
     else:
         ssh_cmd = 'ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no {user}@{host} "{cmd}"'.format(
             user=user, host=host, cmd=cmd.replace('"', '\\"')
         )
-    try:
-        result = subprocess.run(
-            ssh_cmd, shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=30,
-        )
-        stdout = result.stdout.decode('utf-8', errors='replace')
-        stderr = result.stderr.decode('utf-8', errors='replace')
-        return stdout, stderr, result.returncode
-    except subprocess.TimeoutExpired:
-        return '', 'SSH connection timed out (30s)', 1
-    except Exception as exc:
-        return '', str(exc), 1
+        try:
+            result = subprocess.run(
+                ssh_cmd, shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30,
+            )
+            stdout = result.stdout.decode('utf-8', errors='replace')
+            stderr = result.stderr.decode('utf-8', errors='replace')
+            return stdout, stderr, result.returncode
+        except subprocess.TimeoutExpired:
+            return '', 'SSH connection timed out (30s)', 1
+        except Exception as exc:
+            return '', str(exc), 1
 
 
 def run_script(server_cfg, script_name, service, general):
