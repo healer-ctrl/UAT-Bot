@@ -218,9 +218,19 @@ def run_script(server_cfg, script_name, service, general):
     else:
         actual_script = script_name
         if script_name == general.get('start_script', 'app_start.sh'):
-            actual_script = server_cfg.get('start_script.' + service, 'startSI' if service == 'si' else 'startNAPAll.sh')
+            if service == 'si':
+                actual_script = server_cfg.get('start_script.si', 'startSI')
+            elif service == 'batch':
+                actual_script = server_cfg.get('start_script.batch', 'startNAPAll.sh')
+            else:
+                actual_script = server_cfg.get('start_script.' + service, 'app_start.sh')
         elif script_name == general.get('stop_script', 'app_stop.sh'):
-            actual_script = server_cfg.get('stop_script.' + service, 'stopSI' if service == 'si' else 'stopNAPAll.sh')
+            if service == 'si':
+                actual_script = server_cfg.get('stop_script.si', 'stopSI')
+            elif service == 'batch':
+                actual_script = server_cfg.get('stop_script.batch', 'stopNAPAll.sh')
+            else:
+                actual_script = server_cfg.get('stop_script.' + service, 'app_stop.sh')
         cmd = 'sh {dir}/{script} {svc}'.format(
             dir=scripts_dir, script=actual_script, svc=service
         )

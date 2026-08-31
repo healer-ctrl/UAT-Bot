@@ -270,9 +270,19 @@ def run_script(server_key, script_name, service):
     else:
         actual_script = script_name
         if script_name == GENERAL.get('start_script', 'app_start.sh'):
-            actual_script = sc.get('start_script.' + service, 'startSI' if service == 'si' else 'startNAPAll.sh')
+            if service == 'si':
+                actual_script = sc.get('start_script.si', 'startSI')
+            elif service == 'batch':
+                actual_script = sc.get('start_script.batch', 'startNAPAll.sh')
+            else:
+                actual_script = sc.get('start_script.' + service, 'app_start.sh')
         elif script_name == GENERAL.get('stop_script', 'app_stop.sh'):
-            actual_script = sc.get('stop_script.' + service, 'stopSI' if service == 'si' else 'stopNAPAll.sh')
+            if service == 'si':
+                actual_script = sc.get('stop_script.si', 'stopSI')
+            elif service == 'batch':
+                actual_script = sc.get('stop_script.batch', 'stopNAPAll.sh')
+            else:
+                actual_script = sc.get('stop_script.' + service, 'app_stop.sh')
         cmd = 'sh {d}/{s} {svc}'.format(d=scripts_dir, s=actual_script, svc=service)
         
     return _run_local(cmd) if is_local(host) else _run_remote(host, user, cmd, password)
