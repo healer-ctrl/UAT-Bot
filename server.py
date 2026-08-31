@@ -1304,7 +1304,7 @@ ul { padding-left: 16px; }
         <button class="qbtn" onclick="sendQuick('is EAI up?')">EAI status</button>
         <button class="qbtn" onclick="sendQuick('is cans up?')">cans status</button>
         <button class="qbtn" onclick="sendQuick('is rmq-producer up?')">rmq status</button>
-        <button class="qbtn" onclick="sendQuick('is wmq-file-Integrator up?')">wmq status</button>
+        <button class="qbtn" onclick="sendQuick('is wmq-file-integrator up?')">wmq status</button>
         <button class="qbtn" onclick="sendQuick('help')">&#63; Help</button>
       </div>
       <div class="input-row">
@@ -1430,8 +1430,8 @@ function refreshDash(){
     });
 }
 
-// Auto-refresh every 60s
-setInterval(refreshDash, 60000);
+// Auto-refresh every 15s for tight live status synchronization
+setInterval(refreshDash, 15000);
 
 // ── Quick actions from dashboard buttons ──────────────────────────────────────
 function quickAction(intent, service, envKey){
@@ -1486,10 +1486,8 @@ function processChatQueue(){
     thinking.remove();
     renderResponse(data);
     
-    // Refresh dashboard after any action
-    if(next.text.indexOf('__action__') === 0 || /start|stop|restart/i.test(next.text)){
-      setTimeout(refreshDash, 1500);
-    }
+    // Instantly refresh live dashboard table as soon as command finishes
+    refreshDash();
     
     processingQueue = false;
     processChatQueue();
