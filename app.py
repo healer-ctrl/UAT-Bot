@@ -224,7 +224,11 @@ def run_script(server_cfg, script_name, service, general):
     password    = server_cfg.get('password.' + service, server_cfg.get('password', None))
     
     if script_name == general.get('status_script', 'app_status.sh') and service in ('si', 'batch'):
-        cmd = 'jps'
+        actual_script = server_cfg.get('status_script.' + service)
+        if not actual_script:
+            cmd = 'jps'
+        else:
+            cmd = 'cd {dir} && sh {script}'.format(dir=scripts_dir, script=actual_script)
     else:
         actual_script = script_name
         if script_name == general.get('start_script', 'app_start.sh'):
@@ -293,14 +297,31 @@ def check_svc_status(server_cfg, service, general):
         return 'ERROR', '-', stderr.strip()[:200]
         
     if service == 'si':
-        count = stdout.count('MasterThread')
-        state = 'UP' if count >= 2 else 'DOWN'
-        return state, '-', '{0} ({1}/2 MasterThread)'.format(state, count)
+        actual_script = server_cfg.get('status_script.si')
+        if actual_script:
+            lines = [l.strip() for l in stdout.splitlines() if l.strip()]
+            state_val = lines[-1] if lines else 'UNKNOWN'
+            is_up = 'running' in state_val.lower() and 'not' not in state_val.lower()
+            state_str = 'UP' if is_up else 'DOWN'
+            return state_str, '-', '{0} ({1})'.format(state_str, state_val)
+        else:
+            count = stdout.count('MasterThread')
+            state = 'UP' if count >= 2 else 'DOWN'
+            return state, '-', '{0} ({1}/2 MasterThread)'.format(state, count)
+            
     elif service == 'batch':
-        count = stdout.count('NCSAsynchronousProcessor')
-        state = 'UP' if count >= 5 else 'DOWN'
-        return state, '-', '{0} ({1}/5 NAP)'.format(state, count)
-        
+        actual_script = server_cfg.get('status_script.batch')
+        if actual_script:
+            lines = [l.strip() for l in stdout.splitlines() if l.strip()]
+            state_val = lines[-1] if lines else 'UNKNOWN'
+            is_up = 'running' in state_val.lower() and 'not' not in state_val.lower()
+            state_str = 'UP' if is_up else 'DOWN'
+            return state_str, '-', '{0} ({1})'.format(state_str, state_val)
+        else:
+            count = stdout.count('NCSAsynchronousProcessor')
+            state = 'UP' if count >= 5 else 'DOWN'
+            return state, '-', '{0} ({1}/5 NAP)'.format(state, count)
+            
     state = parse_status(stdout)
     pid = extract_pid(stdout) if state == 'UP' else '-'
     return state, pid, state

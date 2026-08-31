@@ -276,7 +276,11 @@ def run_script(server_key, script_name, service):
     password = sc.get('password.' + service, sc.get('password', None))
     
     if script_name == GENERAL.get('status_script', 'app_status.sh') and service in ('si', 'batch'):
-        cmd = 'jps'
+        actual_script = sc.get('status_script.' + service)
+        if not actual_script:
+            cmd = 'jps'
+        else:
+            cmd = 'cd {d} && sh {s}'.format(d=scripts_dir, s=actual_script)
     else:
         actual_script = script_name
         if script_name == GENERAL.get('start_script', 'app_start.sh'):
@@ -300,14 +304,12 @@ def run_script(server_key, script_name, service):
 
 
 def parse_status(out):
-    if 'is running' in out:
+    clean = out.strip().lower()
+    if 'up' in clean or 'running' in clean:
         return 'UP'
-    if 'PID file not found' in out:
+    if 'down' in clean or 'stopped' in clean or 'not running' in clean:
         return 'DOWN'
-    if 'Process not running' in out:
-        m = re.search(r'Process not running:\s*(\d+)', out)
-        return 'STALE ({0})'.format(m.group(1) if m else '?')
-    return 'UNKNOWN'
+    return 'DOWN'
 
 
 def get_pid(out):
@@ -322,14 +324,32 @@ def svc_status(server_key, service):
     if rc != 0 and err.strip():
         return {'state': 'ERROR', 'pid': '-', 'err': err.strip()[:200]}
     
+    sc = SERVERS[server_key]
     if service == 'si':
-        count = out.count('MasterThread')
-        state = 'UP' if count >= 2 else 'DOWN'
-        return {'state': '{0} ({1}/2 MasterThread)'.format(state, count), 'pid': '-'}
+        actual_script = sc.get('status_script.si')
+        if actual_script:
+            lines = [l.strip() for l in out.splitlines() if l.strip()]
+            state_val = lines[-1] if lines else 'UNKNOWN'
+            is_up = 'running' in state_val.lower() and 'not' not in state_val.lower()
+            state_str = 'UP' if is_up else 'DOWN'
+            return {'state': '{0} ({1})'.format(state_str, state_val), 'pid': '-'}
+        else:
+            count = out.count('MasterThread')
+            state = 'UP' if count >= 2 else 'DOWN'
+            return {'state': '{0} ({1}/2 MasterThread)'.format(state, count), 'pid': '-'}
+            
     elif service == 'batch':
-        count = out.count('NCSAsynchronousProcessor')
-        state = 'UP' if count >= 5 else 'DOWN'
-        return {'state': '{0} ({1}/5 NAP)'.format(state, count), 'pid': '-'}
+        actual_script = sc.get('status_script.batch')
+        if actual_script:
+            lines = [l.strip() for l in out.splitlines() if l.strip()]
+            state_val = lines[-1] if lines else 'UNKNOWN'
+            is_up = 'running' in state_val.lower() and 'not' not in state_val.lower()
+            state_str = 'UP' if is_up else 'DOWN'
+            return {'state': '{0} ({1})'.format(state_str, state_val), 'pid': '-'}
+        else:
+            count = out.count('NCSAsynchronousProcessor')
+            state = 'UP' if count >= 5 else 'DOWN'
+            return {'state': '{0} ({1}/5 NAP)'.format(state, count), 'pid': '-'}
         
     state = parse_status(out)
     return {'state': state, 'pid': get_pid(out) if state == 'UP' else '-'}
