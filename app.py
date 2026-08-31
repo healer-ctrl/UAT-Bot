@@ -387,6 +387,19 @@ def log_activity(env, service, action, status, stdout="", stderr=""):
         sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
 
 
+def wait_for_status_script(server_cfg, service, target_state, general, timeout=45):
+    import time
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        state, pid, display_state = check_svc_status(server_cfg, service, general)
+        if target_state == 'UP' and state.startswith('UP'):
+            return state, pid, display_state
+        elif target_state == 'DOWN' and (state.startswith('DOWN') or state == 'UNKNOWN'):
+            return state, pid, display_state
+        time.sleep(1.5)
+    return check_svc_status(server_cfg, service, general)
+
+
 def do_start(server_key, service, servers, general):
     sc    = servers[server_key]
     label = _env_label(server_key, servers)
@@ -394,17 +407,16 @@ def do_start(server_key, service, servers, general):
 
     stdout, stderr, rc = run_script(sc, general.get('start_script', 'app_start.sh'), service, general)
 
-    state, pid, display_state = check_svc_status(sc, service, general)
-    is_success = (rc == 0) or state.startswith('UP')
-    display_status = display_state if state.startswith('UP') else ('UP (Started, rc=0)' if rc == 0 else display_state)
+    state, pid, display_state = wait_for_status_script(sc, service, 'UP', general, timeout=45)
+    is_up = state.startswith('UP')
     
-    log_activity(label, service, 'START', display_status, stdout, stderr)
+    log_activity(label, service, 'START', display_state, stdout, stderr)
 
-    if is_success:
+    if is_up:
         print('  [OK] {svc} started successfully! Status: {state} | PID: {pid}'.format(
-            svc=service, state=display_status, pid=pid))
+            svc=service, state=display_state, pid=pid))
     else:
-        print('  [FAIL] {svc} failed to start. Status is {state}.'.format(svc=service, state=display_status))
+        print('  [FAIL] {svc} failed to start. Status is still {state}.'.format(svc=service, state=display_state))
         print('  Check activity.log for stdout/stderr error details.')
 
 
@@ -415,16 +427,15 @@ def do_stop(server_key, service, servers, general):
 
     stdout, stderr, rc = run_script(sc, general.get('stop_script', 'app_stop.sh'), service, general)
 
-    state, pid, display_state = check_svc_status(sc, service, general)
-    is_success = (rc == 0) or state.startswith('DOWN') or state == 'UNKNOWN'
-    display_status = display_state if (state.startswith('DOWN') or state == 'UNKNOWN') else ('DOWN (Stopped, rc=0)' if rc == 0 else display_state)
+    state, pid, display_state = wait_for_status_script(sc, service, 'DOWN', general, timeout=45)
+    is_down = state.startswith('DOWN') or state == 'UNKNOWN'
     
-    log_activity(label, service, 'STOP', display_status, stdout, stderr)
+    log_activity(label, service, 'STOP', display_state, stdout, stderr)
 
-    if is_success:
-        print('  [OK] {svc} stopped successfully! Status: {state}'.format(svc=service, state=display_status))
+    if is_down:
+        print('  [OK] {svc} stopped successfully! Status: {state}'.format(svc=service, state=display_state))
     else:
-        print('  [FAIL] {svc} failed to stop. Status is {state}.'.format(svc=service, state=display_status))
+        print('  [FAIL] {svc} failed to stop. Status is still {state}.'.format(svc=service, state=display_state))
         print('  Check activity.log for stdout/stderr error details.')
 
 

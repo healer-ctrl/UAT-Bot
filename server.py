@@ -393,56 +393,64 @@ def log_activity(env, service, action, status, stdout="", stderr=""):
         sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
 
 
+def wait_for_status_script(server_key, service, target_state, timeout=45):
+    import time
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        status = svc_status(server_key, service)
+        state = status.get('state', 'UNKNOWN')
+        if target_state == 'UP' and state.startswith('UP'):
+            return status
+        elif target_state == 'DOWN' and (state.startswith('DOWN') or state == 'UNKNOWN'):
+            return status
+        time.sleep(1.5)
+    return svc_status(server_key, service)
+
+
 def svc_start(server_key, service):
     out, err, rc = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
-    status = svc_status(server_key, service)
+    status = wait_for_status_script(server_key, service, 'UP', timeout=45)
     live_state = status.get('state', 'UNKNOWN')
     
-    is_success = (rc == 0) or live_state.startswith('UP')
-    display_status = live_state if live_state.startswith('UP') else ('UP (Started, rc=0)' if rc == 0 else live_state)
-    
-    log_activity(env_label(server_key), service, 'START', display_status, out, err)
+    is_up = live_state.startswith('UP')
+    log_activity(env_label(server_key), service, 'START', live_state, out, err)
 
-    if is_success:
-        return {'ok': True, 'msg': '✅ <b>{0}</b> started successfully! (Status: <b>{1}</b>)'.format(service, display_status)}
+    if is_up:
+        return {'ok': True, 'msg': '✅ <b>{0}</b> started successfully! Status: <b>{1}</b>'.format(service, live_state)}
     else:
-        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to start (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for stdout/stderr logs.</span>'.format(service, display_status)}
+        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to start. Status is still <b>{1}</b>. <span style="font-size:11px;color:var(--muted)">Check activity.log for stdout/stderr logs.</span>'.format(service, live_state)}
 
 
 def svc_stop(server_key, service):
     out, err, rc = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
-    status = svc_status(server_key, service)
+    status = wait_for_status_script(server_key, service, 'DOWN', timeout=45)
     live_state = status.get('state', 'UNKNOWN')
     
-    is_success = (rc == 0) or live_state.startswith('DOWN') or live_state == 'UNKNOWN'
-    display_status = live_state if (live_state.startswith('DOWN') or live_state == 'UNKNOWN') else ('DOWN (Stopped, rc=0)' if rc == 0 else live_state)
-    
-    log_activity(env_label(server_key), service, 'STOP', display_status, out, err)
+    is_down = live_state.startswith('DOWN') or live_state == 'UNKNOWN'
+    log_activity(env_label(server_key), service, 'STOP', live_state, out, err)
 
-    if is_success:
-        return {'ok': True, 'msg': '✅ <b>{0}</b> stopped successfully! (Status: <b>{1}</b>)'.format(service, display_status)}
+    if is_down:
+        return {'ok': True, 'msg': '✅ <b>{0}</b> stopped successfully! Status: <b>{1}</b>'.format(service, live_state)}
     else:
-        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to stop (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for stdout/stderr logs.</span>'.format(service, display_status)}
+        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to stop. Status is still <b>{1}</b>. <span style="font-size:11px;color:var(--muted)">Check activity.log for stdout/stderr logs.</span>'.format(service, live_state)}
 
 
 def svc_restart(server_key, service):
     out_stop, err_stop, rc_stop = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
-    status_stop = svc_status(server_key, service)
+    status_stop = wait_for_status_script(server_key, service, 'DOWN', timeout=45)
     live_state_stop = status_stop.get('state', 'UNKNOWN')
-    display_status_stop = live_state_stop if (live_state_stop.startswith('DOWN') or live_state_stop == 'UNKNOWN') else ('DOWN (Stopped, rc=0)' if rc_stop == 0 else live_state_stop)
-    log_activity(env_label(server_key), service, 'RESTART_STOP', display_status_stop, out_stop, err_stop)
+    log_activity(env_label(server_key), service, 'RESTART_STOP', live_state_stop, out_stop, err_stop)
     
     out_start, err_start, rc_start = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
-    status_start = svc_status(server_key, service)
+    status_start = wait_for_status_script(server_key, service, 'UP', timeout=45)
     live_state_start = status_start.get('state', 'UNKNOWN')
-    display_status_start = live_state_start if live_state_start.startswith('UP') else ('UP (Started, rc=0)' if rc_start == 0 else live_state_start)
-    log_activity(env_label(server_key), service, 'RESTART_START', display_status_start, out_start, err_start)
+    log_activity(env_label(server_key), service, 'RESTART_START', live_state_start, out_start, err_start)
 
-    is_success = (rc_start == 0) or live_state_start.startswith('UP')
-    if is_success:
-        return {'ok': True, 'msg': '✅ <b>{0}</b> restarted successfully! (Status: <b>{1}</b>)'.format(service, display_status_start)}
+    is_up = live_state_start.startswith('UP')
+    if is_up:
+        return {'ok': True, 'msg': '✅ <b>{0}</b> restarted successfully! Status: <b>{1}</b>'.format(service, live_state_start)}
     else:
-        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to restart (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for details.</span>'.format(service, display_status_start)}
+        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to restart. Status: <b>{1}</b>. <span style="font-size:11px;color:var(--muted)">Check activity.log for details.</span>'.format(service, live_state_start)}
 
 
 # ── Chat response builders ────────────────────────────────────────────────────
