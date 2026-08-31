@@ -393,6 +393,27 @@ def log_activity(env, service, action, status, stdout="", stderr=""):
         sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
 
 
+def log_event(level, module, message, details=None):
+    """
+    Production-grade industry logging for Ops Chatbot.
+    Logs [INFO], [ERROR], [DEBUG] events to activity.log and server.log for host debugging.
+    """
+    import datetime
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_line = "[{ts}] [{lvl}] [{mod}] {msg}".format(ts=timestamp, lvl=level.upper(), mod=module, msg=message)
+    if details:
+        log_line += "\n  Details: " + str(details).replace("\n", "\n  ")
+    log_line += "\n"
+    
+    log_dir = os.path.dirname(os.path.abspath(__file__))
+    for fname in ('activity.log', 'server.log'):
+        try:
+            with open(os.path.join(log_dir, fname), 'a', encoding='utf-8') as f:
+                f.write(log_line)
+        except Exception:
+            pass
+
+
 def wait_for_status_script(server_key, service, target_state, timeout=45):
     import time
     t0 = time.time()
@@ -655,13 +676,13 @@ def _flow_check_response(flow_key, env_key):
         state = r.get('state', 'UNKNOWN')
         pid = r.get('pid', '-')
 
-        # Actuator check for wmq-file-Integrator if process is running
+        # Actuator check for wmq-file-integrator if process is running
         actuator_state = None
         actuator_err = None
-        if svc == 'wmq-file-Integrator' and state == 'UP':
+        if svc.lower() == 'wmq-file-integrator' and state == 'UP':
             from api_checker import check_api
             api_cfg = {
-                'name': 'wmq-file-Integrator Actuator',
+                'name': 'wmq-file-integrator Actuator',
                 'type': 'actuator',
                 'health_url_template': 'https://capstone-mercury-{env_label}.fr.world.socgen:8900/actuator/health',
                 'timeout_sec': 5
@@ -672,7 +693,7 @@ def _flow_check_response(flow_key, env_key):
                 actuator_err = act_res.get('error')
 
         is_up = (state == 'UP')
-        if svc == 'wmq-file-Integrator' and actuator_state and actuator_state != 'UP':
+        if svc.lower() == 'wmq-file-integrator' and actuator_state and actuator_state != 'UP':
             is_up = False
             state = 'UP (Process) | DOWN (Actuator)'
 
@@ -690,6 +711,7 @@ def _flow_check_response(flow_key, env_key):
 
     if api_names:
         if not VAULT_READY or VAULT is None:
+            log_event('ERROR', 'VAULT', 'Vault not ready or failed to connect when checking flow "{0}" in [{1}]'.format(flow_key, label))
             # Fallback for TCP checks if Vault not ready
             from api_checker import get_apis, check_api
             apis = [a for a in get_apis() if a.get('name') in api_names]
@@ -713,6 +735,8 @@ def _flow_check_response(flow_key, env_key):
                 secrets = VAULT.get_secret(secret_path) if secret_path else {}
             except Exception as exc:
                 secrets = {}
+                import traceback
+                log_event('ERROR', 'VAULT', 'Failed to fetch secrets from Vault at path "{0}" for flow "{1}" in [{2}]'.format(secret_path, flow_key, label), traceback.format_exc())
 
             from api_checker import check_api, get_apis
             import threading

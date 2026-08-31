@@ -158,6 +158,23 @@ def check_api(api_cfg, vault_secrets, ssl_ctx_obj=None, server_cfg=None):
 
         health_url = _clean_url(raw_url)
 
+def _log_server_event(level, module, message, details=None):
+    """Write structured industry logs to activity.log and server.log for host debugging."""
+    try:
+        import datetime
+        ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        line = "[{0}] [{1}] [{2}] {3}".format(ts, level.upper(), module, message)
+        if details:
+            line += "\n  Details: " + str(details).replace("\n", "\n  ")
+        line += "\n"
+        log_dir = os.path.dirname(os.path.abspath(__file__))
+        for fname in ('activity.log', 'server.log'):
+            with open(os.path.join(log_dir, fname), 'a', encoding='utf-8') as f:
+                f.write(line)
+    except Exception:
+        pass
+
+
     # ── Build auth headers ────────────────────────────────────────────────────
     headers   = {}
     auth_cfg  = api_cfg.get('auth', {})
@@ -174,6 +191,7 @@ def check_api(api_cfg, vault_secrets, ssl_ctx_obj=None, server_cfg=None):
         if not client_id or not client_secret or not token_url:
             result['state'] = 'CONFIG_ERROR'
             result['error'] = 'Missing OAuth2 credentials in Vault secret for: {0}'.format(name)
+            _log_server_event('ERROR', 'API_AUTH', 'Missing credentials for API {0}'.format(name), result['error'])
             return result
 
         try:
@@ -182,6 +200,7 @@ def check_api(api_cfg, vault_secrets, ssl_ctx_obj=None, server_cfg=None):
         except Exception as exc:
             result['state'] = 'AUTH_ERROR'
             result['error'] = str(exc)[:250]
+            _log_server_event('ERROR', 'API_AUTH', 'OAuth2 token fetch failed for API {0} at {1}'.format(name, token_url), str(exc))
             return result
 
     # ── Poll the API ──────────────────────────────────────────────────────────
@@ -201,12 +220,15 @@ def check_api(api_cfg, vault_secrets, ssl_ctx_obj=None, server_cfg=None):
 
         if 200 <= status_code < 300:
             result['state'] = 'UP'
+            _log_server_event('INFO', 'API_CHECK', 'API {0} UP (HTTP {1}, {2}ms)'.format(name, status_code, elapsed))
         elif 400 <= status_code < 500:
             # 4xx means API is reachable; our probe just has no valid params — treat as UP
             result['state'] = 'UP'
+            _log_server_event('INFO', 'API_CHECK', 'API {0} UP (Probe HTTP {1}, {2}ms)'.format(name, status_code, elapsed))
         else:
             result['state'] = 'DOWN'
             result['error'] = 'HTTP {0}'.format(status_code)
+            _log_server_event('ERROR', 'API_CHECK', 'API {0} DOWN (HTTP {1}, {2}ms)'.format(name, status_code, elapsed), 'URL: {0}'.format(health_url))
 
     except urllib.error.URLError as exc:
         elapsed = int((time.time() - t0) * 1000)
@@ -214,12 +236,14 @@ def check_api(api_cfg, vault_secrets, ssl_ctx_obj=None, server_cfg=None):
         result['response_time_ms']  = elapsed
         reason = str(exc.reason) if hasattr(exc, 'reason') else str(exc)
         result['error'] = reason[:200]
+        _log_server_event('ERROR', 'API_CHECK', 'API {0} UNREACHABLE at {1}'.format(name, health_url), reason)
 
     except Exception as exc:
         elapsed = int((time.time() - t0) * 1000)
         result['state']             = 'ERROR'
         result['response_time_ms']  = elapsed
         result['error']             = str(exc)[:200]
+        _log_server_event('ERROR', 'API_CHECK', 'API {0} EXCEPTION at {1}'.format(name, health_url), str(exc))
 
     return result
 
@@ -244,6 +268,7 @@ def check_all_apis(vault_client, server_cfg, api_names=None):
         secrets = vault_client.get_secret(secret_path) if (vault_client and secret_path) else {}
     except Exception as exc:
         error_msg = 'Vault error: {0}'.format(exc)
+        _log_server_event('ERROR', 'VAULT', 'Failed to fetch secrets from Vault at path "{0}"'.format(secret_path), str(exc))
         return [{
             'name':             'Vault',
             'state':            'ERROR',
