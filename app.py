@@ -259,24 +259,14 @@ def run_script(server_cfg, script_name, service, general):
 # -- Status output parsing -----------------------------------------------------
 
 def parse_status(output):
-    """
-    Parse app_status.sh output.
-    Contract:
-      'is running'          -> UP
-      'PID file not found'  -> DOWN (no pid file)
-      'Process not running' -> DOWN (stale pid)
-    """
-    if 'is running' in output:
-        return 'UP'
-    if 'PID file not found' in output:
+    clean = output.strip().lower()
+    if 'not running' in clean:
         return 'DOWN'
-    if 'Process not running' in output:
-        m = re.search(r'Process not running:\s*(\d+)', output)
-        pid = m.group(1) if m else '?'
-        return 'DOWN (stale pid {0})'.format(pid)
-    if output.strip() == '':
-        return 'NO OUTPUT'
-    return 'UNKNOWN'
+    if 'is running' in clean or 'running' in clean or 'up' in clean:
+        return 'UP'
+    if 'pid file not found' in clean or 'stopped' in clean or 'down' in clean:
+        return 'DOWN'
+    return 'DOWN'
 
 
 def extract_pid(output):
@@ -396,7 +386,7 @@ def log_activity(env, service, action, status, stdout="", stderr=""):
         sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
 
 
-def wait_for_state(server_cfg, service, target_state, general, timeout=10):
+def wait_for_state(server_cfg, service, target_state, general, timeout=25):
     import time
     t0 = time.time()
     while time.time() - t0 < timeout:
@@ -420,7 +410,7 @@ def do_start(server_key, service, servers, general):
 
     stdout, stderr, rc = run_script(sc, general.get('start_script', 'app_start.sh'), service, general)
 
-    state, pid, display_state = wait_for_state(sc, service, 'UP', general, timeout=10)
+    state, pid, display_state = wait_for_state(sc, service, 'UP', general, timeout=25)
     is_up = state.startswith('UP')
     
     log_activity(label, service, 'START', display_state, stdout, stderr)
@@ -440,7 +430,7 @@ def do_stop(server_key, service, servers, general):
 
     stdout, stderr, rc = run_script(sc, general.get('stop_script', 'app_stop.sh'), service, general)
 
-    state, pid, display_state = wait_for_state(sc, service, 'DOWN', general, timeout=10)
+    state, pid, display_state = wait_for_state(sc, service, 'DOWN', general, timeout=25)
     is_down = state.startswith('DOWN') or state == 'UNKNOWN'
     
     log_activity(label, service, 'STOP', display_state, stdout, stderr)

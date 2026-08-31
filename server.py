@@ -305,9 +305,11 @@ def run_script(server_key, script_name, service):
 
 def parse_status(out):
     clean = out.strip().lower()
+    if 'not running' in clean:
+        return 'DOWN'
     if 'up' in clean or 'running' in clean:
         return 'UP'
-    if 'down' in clean or 'stopped' in clean or 'not running' in clean:
+    if 'down' in clean or 'stopped' in clean or 'pid file not found' in clean:
         return 'DOWN'
     return 'DOWN'
 
@@ -391,7 +393,7 @@ def log_activity(env, service, action, status, stdout="", stderr=""):
         sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
 
 
-def wait_for_state(server_key, service, target_state, timeout=10):
+def wait_for_state(server_key, service, target_state, timeout=25):
     import time
     t0 = time.time()
     while time.time() - t0 < timeout:
@@ -411,7 +413,7 @@ def wait_for_state(server_key, service, target_state, timeout=10):
 
 def svc_start(server_key, service):
     out, err, rc = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
-    status = wait_for_state(server_key, service, 'UP', timeout=10)
+    status = wait_for_state(server_key, service, 'UP', timeout=25)
     state = status.get('state', 'UNKNOWN')
     
     is_up = state.startswith('UP')
@@ -425,7 +427,7 @@ def svc_start(server_key, service):
 
 def svc_stop(server_key, service):
     out, err, rc = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
-    status = wait_for_state(server_key, service, 'DOWN', timeout=10)
+    status = wait_for_state(server_key, service, 'DOWN', timeout=25)
     state = status.get('state', 'UNKNOWN')
     
     is_down = state.startswith('DOWN') or state == 'UNKNOWN'
@@ -439,21 +441,20 @@ def svc_stop(server_key, service):
 
 def svc_restart(server_key, service):
     out_stop, err_stop, rc_stop = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
-    wait_for_state(server_key, service, 'DOWN', timeout=10)
+    status_stop = wait_for_state(server_key, service, 'DOWN', timeout=25)
+    state_stop = status_stop.get('state', 'UNKNOWN')
+    log_activity(env_label(server_key), service, 'RESTART_STOP', state_stop, out_stop, err_stop)
     
     out_start, err_start, rc_start = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
-    status = wait_for_state(server_key, service, 'UP', timeout=10)
-    
-    state = status.get('state', 'UNKNOWN')
-    is_up = state.startswith('UP')
-    
-    log_activity(env_label(server_key), service, 'RESTART_STOP', state, out_stop, err_stop)
-    log_activity(env_label(server_key), service, 'RESTART_START', state, out_start, err_start)
+    status_start = wait_for_state(server_key, service, 'UP', timeout=25)
+    state_start = status_start.get('state', 'UNKNOWN')
+    log_activity(env_label(server_key), service, 'RESTART_START', state_start, out_start, err_start)
 
+    is_up = state_start.startswith('UP')
     if is_up:
-        return {'ok': True, 'msg': '✅ <b>{0}</b> restarted successfully (State: <b>{1}</b>)'.format(service, state)}
+        return {'ok': True, 'msg': '✅ <b>{0}</b> restarted successfully (State: <b>{1}</b>)'.format(service, state_start)}
     else:
-        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to restart (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for details.</span>'.format(service, state)}
+        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to restart (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for details.</span>'.format(service, state_start)}
 
 
 # ── Chat response builders ────────────────────────────────────────────────────
