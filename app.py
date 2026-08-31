@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-app.py — UAT Ops Chatbot main loop.
+app.py - UAT Ops Chatbot main loop.
 
 stdlib only. Python 3.6+ compatible.
 No paramiko, no pip dependencies.
@@ -27,7 +27,7 @@ from intents import (
     extract_env,
 )
 
-# ── Config ────────────────────────────────────────────────────────────────────
+# -- Config --------------------------------------------------------------------
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_FILE  = os.path.join(_SCRIPT_DIR, 'config.ini')
@@ -65,7 +65,7 @@ def get_all_services(servers):
     return seen
 
 
-# ── SSH / local execution ─────────────────────────────────────────────────────
+# -- SSH / local execution -----------------------------------------------------
 
 def _my_hostname():
     try:
@@ -84,7 +84,7 @@ def is_local(host):
 def _run_local(cmd):
     """
     Run a shell command locally.
-    Uses Popen + temp files — NOT PIPE — because Python 3.6's
+    Uses Popen + temp files - NOT PIPE - because Python 3.6's
     communicate() can deadlock when a script forks a background
     daemon that keeps the pipe fd open.
     Returns (stdout_str, stderr_str, returncode).
@@ -231,15 +231,15 @@ def run_script(server_cfg, script_name, service, general):
         return _run_remote(host, user, cmd, password)
 
 
-# ── Status output parsing ─────────────────────────────────────────────────────
+# -- Status output parsing -----------------------------------------------------
 
 def parse_status(output):
     """
     Parse app_status.sh output.
     Contract:
-      'is running'          → UP
-      'PID file not found'  → DOWN (no pid file)
-      'Process not running' → DOWN (stale pid)
+      'is running'          -> UP
+      'PID file not found'  -> DOWN (no pid file)
+      'Process not running' -> DOWN (stale pid)
     """
     if 'is running' in output:
         return 'UP'
@@ -259,7 +259,7 @@ def extract_pid(output):
     return m.group(1) if m else '-'
 
 
-# ── Action helpers ────────────────────────────────────────────────────────────
+# -- Action helpers ------------------------------------------------------------
 
 def _env_label(server_key, servers):
     sc = servers.get(server_key, {})
@@ -295,7 +295,7 @@ def do_status(server_key, service, servers, general):
         print('  ERROR: {0}'.format(display_state))
         return
 
-    icon  = 'UP  ✅' if state == 'UP' else 'DOWN ❌'
+    icon  = 'UP  [OK]' if state == 'UP' else 'DOWN [FAIL]'
     print('  [{env}] {svc}: {state} | PID: {pid}'.format(
         env=label, svc=service, state=icon if service not in ('si', 'batch') else display_state, pid=pid))
 
@@ -316,7 +316,7 @@ def do_status_all(server_key, servers, general):
     up_count = 0
     for svc in services:
         state, pid, display_state = check_svc_status(sc, svc, general)
-        icon  = '✅' if state == 'UP' else '❌'
+        icon  = '[OK]' if state == 'UP' else '[FAIL]'
         if state == 'UP':
             up_count += 1
         print('  {icon} {svc:<{w}} {state:<14} {pid}'.format(
@@ -335,9 +335,9 @@ def do_start(server_key, service, servers, general):
     stdout, stderr, rc = run_script(sc, general.get('start_script', 'app_start.sh'), service, general)
 
     if rc == 0:
-        print('  ✅ Start command sent for {0}'.format(service))
+        print('  [OK] Start command sent for {0}'.format(service))
     else:
-        print('  ❌ Start failed for {svc}: {err}'.format(svc=service, err=(stderr or stdout).strip()[:200]))
+        print('  [FAIL] Start failed for {svc}: {err}'.format(svc=service, err=(stderr or stdout).strip()[:200]))
 
     if stdout.strip():
         print('  >> {0}'.format(stdout.strip()[:200]))
@@ -351,9 +351,9 @@ def do_stop(server_key, service, servers, general):
     stdout, stderr, rc = run_script(sc, general.get('stop_script', 'app_stop.sh'), service, general)
 
     if rc == 0:
-        print('  ✅ Stop command sent for {0}'.format(service))
+        print('  [OK] Stop command sent for {0}'.format(service))
     else:
-        print('  ❌ Stop failed for {svc}: {err}'.format(svc=service, err=(stderr or stdout).strip()[:200]))
+        print('  [FAIL] Stop failed for {svc}: {err}'.format(svc=service, err=(stderr or stdout).strip()[:200]))
 
     if stdout.strip():
         print('  >> {0}'.format(stdout.strip()[:200]))
@@ -364,7 +364,7 @@ def do_restart(server_key, service, servers, general):
     do_start(server_key, service, servers, general)
 
 
-# ── Execute intent ────────────────────────────────────────────────────────────
+# -- Execute intent ------------------------------------------------------------
 
 def execute_intent(intent, service, server_key, servers, general):
     if intent == 'start':
@@ -377,11 +377,11 @@ def execute_intent(intent, service, server_key, servers, general):
         do_status(server_key, service, servers, general)
 
 
-# ── Help / meta ───────────────────────────────────────────────────────────────
+# -- Help / meta ---------------------------------------------------------------
 
 HELP_TEXT = """
 +-------------------------------------------------------------+
-|         UAT Ops Chatbot  —  Command Reference               |
+|         UAT Ops Chatbot  -  Command Reference               |
 +-------------------------------------------------------------+
  STATUS:
    is EAI up?                 check one service
@@ -408,7 +408,7 @@ HELP_TEXT = """
    help                       show this help
    exit / quit                exit chatbot
 
- ENVIRONMENTS  →  alias examples:
+ ENVIRONMENTS  ->  alias examples:
    UAT     030  uat  uatap030
    PrePro  036  jpp  jprepro  prepro
    SIT     027  sit  dev  jsit
@@ -429,11 +429,11 @@ def print_services(server_key, servers):
         print('    - {0}'.format(svc))
 
 
-# ── Disambiguation helpers ────────────────────────────────────────────────────
+# -- Disambiguation helpers ----------------------------------------------------
 
 def _ask_which_service(options, intent):
     """Print disambiguation prompt and return pending dict."""
-    print('  Multiple matches — did you mean:')
+    print('  Multiple matches - did you mean:')
     for i, s in enumerate(options):
         print('    {0}. {1}'.format(i + 1, s))
     return {'type': 'service', 'options': options, 'intent': intent}
@@ -441,7 +441,7 @@ def _ask_which_service(options, intent):
 
 def _ask_which_env(service, candidate_keys, intent, servers):
     """Print env disambiguation prompt and return pending dict."""
-    print('  {svc} exists on multiple environments — which one?'.format(svc=service))
+    print('  {svc} exists on multiple environments - which one?'.format(svc=service))
     for i, k in enumerate(candidate_keys):
         sc = servers[k]
         print('    {0}. [{1}] {2}'.format(i + 1, _env_label(k, servers), sc['host']))
@@ -469,13 +469,13 @@ def _resolve_number_or_text(user_input, options):
     return None
 
 
-# ── Main loop ─────────────────────────────────────────────────────────────────
+# -- Main loop -----------------------------------------------------------------
 
 def main():
     general, service_aliases, servers = load_config()
 
     if not servers:
-        print('ERROR: No servers configured in config.ini — check the [server:XXX] sections.')
+        print('ERROR: No servers configured in config.ini - check the [server:XXX] sections.')
         sys.exit(1)
 
     # Default environment: 030/UAT if present, else first defined
@@ -487,7 +487,7 @@ def main():
 
     print('')
     print('  UAT Ops Chatbot  |  type "help" for commands, "exit" to quit')
-    print('  Connected to: [{env}] → {host}'.format(
+    print('  Connected to: [{env}] -> {host}'.format(
         env=_env_label(current_key, servers),
         host=servers[current_key]['host']))
     print('')
@@ -504,32 +504,32 @@ def main():
 
         lower = user_input.lower()
 
-        # ── Exit ─────────────────────────────────────────────────────────────
+        # -- Exit -------------------------------------------------------------
         if lower in ('exit', 'quit', 'bye', 'q', ':q'):
             print('  Bye!')
             break
 
-        # ── Help ─────────────────────────────────────────────────────────────
+        # -- Help -------------------------------------------------------------
         if lower in ('help', '?', 'h', 'commands'):
             print_help()
             continue
 
-        # ── List services ─────────────────────────────────────────────────────
+        # -- List services -----------------------------------------------------
         if re.search(r'\blist\b.*(service|app)', lower) or lower in ('services', 'apps'):
             print_services(current_key, servers)
             continue
 
-        # ── Which server ──────────────────────────────────────────────────────
+        # -- Which server ------------------------------------------------------
         if re.search(r'\b(which|current|where|what).*(server|env|environment|host)\b', lower) \
                 or 'am i on' in lower or 'which server' in lower:
             sc = servers[current_key]
-            print('  Current: [{env}] → {host}  (user: {user})'.format(
+            print('  Current: [{env}] -> {host}  (user: {user})'.format(
                 env=_env_label(current_key, servers),
                 host=sc['host'],
                 user=sc.get('user', 'cpndev01')))
             continue
 
-        # ── Pending disambiguation (multi-turn) ───────────────────────────────
+        # -- Pending disambiguation (multi-turn) -------------------------------
         if pending:
             ptype = pending.get('type')
 
@@ -562,7 +562,7 @@ def main():
                         ', '.join('[{0}]'.format(_env_label(k, servers)) for k in pending['options'])))
                 continue
 
-        # ── Environment switch ────────────────────────────────────────────────
+        # -- Environment switch ------------------------------------------------
         _SWITCH_TRIGGERS = ('switch to', 'use ', 'connect to', 'change to',
                             'go to ', 'change env', 'switch env')
         is_switch = any(t in lower for t in _SWITCH_TRIGGERS)
@@ -571,7 +571,7 @@ def main():
             if extracted:
                 current_key = extracted
                 sc = servers[current_key]
-                print('  Switched to [{env}] → {host}'.format(
+                print('  Switched to [{env}] -> {host}'.format(
                     env=_env_label(current_key, servers), host=sc['host']))
             else:
                 print('  Unknown environment. Available:')
@@ -582,13 +582,13 @@ def main():
                         aliases=sc.get('aliases', '')))
             continue
 
-        # ── Parse intent and env ──────────────────────────────────────────────
+        # -- Parse intent and env ----------------------------------------------
         intent   = classify_intent(user_input)
         is_all   = is_all_request(user_input)
         target   = extract_env(user_input, servers) or current_key
         sc       = servers[target]
 
-        # ── "All services" branch ─────────────────────────────────────────────
+        # -- "All services" branch ---------------------------------------------
         if is_all:
             if intent == 'status':
                 do_status_all(target, servers, general)
@@ -612,7 +612,7 @@ def main():
                     print('  Cancelled.')
             continue
 
-        # ── Single service branch ─────────────────────────────────────────────
+        # -- Single service branch ---------------------------------------------
         service = extract_service(user_input, sc.get('services', []), service_aliases)
 
         # -- Service NOT found directly --
@@ -631,7 +631,7 @@ def main():
                 print("  Did you mean '{0}'? (yes/no)".format(svc))
                 confirm = input('You: ').strip().lower()
                 if confirm not in ('yes', 'y', ''):
-                    print("  OK — let me know what you need. Type 'help' for commands.")
+                    print("  OK - let me know what you need. Type 'help' for commands.")
                     continue
                 service = svc
                 # Fall through to resolve server below
