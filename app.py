@@ -231,7 +231,7 @@ def run_script(server_cfg, script_name, service, general):
                 actual_script = server_cfg.get('stop_script.batch', 'stopNAPAll.sh')
             else:
                 actual_script = server_cfg.get('stop_script.' + service, 'app_stop.sh')
-        cmd = 'sh {dir}/{script} {svc}'.format(
+        cmd = 'cd {dir} && sh {script} {svc}'.format(
             dir=scripts_dir, script=actual_script, svc=service
         )
 

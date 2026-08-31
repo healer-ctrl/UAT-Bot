@@ -283,7 +283,7 @@ def run_script(server_key, script_name, service):
                 actual_script = sc.get('stop_script.batch', 'stopNAPAll.sh')
             else:
                 actual_script = sc.get('stop_script.' + service, 'app_stop.sh')
-        cmd = 'sh {d}/{s} {svc}'.format(d=scripts_dir, s=actual_script, svc=service)
+        cmd = 'cd {d} && sh {s} {svc}'.format(d=scripts_dir, s=actual_script, svc=service)
         
     return _run_local(cmd) if is_local(host) else _run_remote(host, user, cmd, password)
 
@@ -1347,7 +1347,7 @@ function refreshDash(){
       var up   = 0;
       data.services.forEach(function(s){
         var state = s.state || 'UNKNOWN';
-        var isUp  = state === 'UP';
+        var isUp  = state.indexOf('UP') === 0;
         if(isUp) up++;
         var dotClass = isUp ? 'dot-up' : (state.indexOf('STALE') > -1 ? 'dot-stale' : 'dot-down');
         var dot = '<span class="' + dotClass + '">&#9679;</span>';
@@ -1356,9 +1356,9 @@ function refreshDash(){
           + '<td>' + dot + ' ' + state + '</td>'
           + '<td>' + (s.pid || '-') + '</td>'
           + '<td class="action-cell">'
-          + '<button title="Start"  onclick="quickAction(\'start\',\'' + s.service + '\',\'' + currentEnv + '\')">&#9654;</button>'
-          + '<button title="Stop"   onclick="quickAction(\'stop\',\''  + s.service + '\',\'' + currentEnv + '\')">&#9632;</button>'
-          + '<button title="Restart" onclick="quickAction(\'restart\',\''+ s.service + '\',\'' + currentEnv + '\')">&#8635;</button>'
+          + '<button title="Start"  onclick="quickAction(&quot;start&quot;,&quot;' + s.service + '&quot;,&quot;' + currentEnv + '&quot;)">&#9654;</button>'
+          + '<button title="Stop"   onclick="quickAction(&quot;stop&quot;,&quot;'  + s.service + '&quot;,&quot;' + currentEnv + '&quot;)">&#9632;</button>'
+          + '<button title="Restart" onclick="quickAction(&quot;restart&quot;,&quot;' + s.service + '&quot;,&quot;' + currentEnv + '&quot;)">&#8635;</button>'
           + '</td></tr>';
       });
       tbody.innerHTML = html || '<tr><td colspan="4">No services found.</td></tr>';
