@@ -35,7 +35,7 @@ CONFIG_FILE  = os.path.join(_SCRIPT_DIR, 'config.ini')
 
 def load_config():
     cfg = configparser.ConfigParser()
-    cfg.read(CONFIG_FILE)
+    cfg.read(CONFIG_FILE, encoding='utf-8')
 
     general = dict(cfg['general']) if 'general' in cfg else {}
 

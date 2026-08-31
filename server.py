@@ -48,7 +48,7 @@ _DIR = os.path.dirname(os.path.abspath(__file__))
 
 def load_config():
     cfg = configparser.ConfigParser()
-    cfg.read(os.path.join(_DIR, 'config.ini'))
+    cfg.read(os.path.join(_DIR, 'config.ini'), encoding='utf-8')
     general = dict(cfg['general']) if 'general' in cfg else {}
     # Also pull in [vault] section into general so VaultClient.from_config can read it
     if 'vault' in cfg:
