@@ -338,35 +338,52 @@ def do_status_all(server_key, servers, general):
 
 
 def do_start(server_key, service, servers, general):
+    import time
     sc    = servers[server_key]
     label = _env_label(server_key, servers)
     print('  Starting {svc} on [{env}]...'.format(svc=service, env=label))
 
     stdout, stderr, rc = run_script(sc, general.get('start_script', 'app_start.sh'), service, general)
 
-    if rc == 0:
-        print('  [OK] Start command sent for {0}'.format(service))
+    time.sleep(2)
+    state, pid, display_state = check_svc_status(sc, service, general)
+    
+    is_up = state.startswith('UP')
+    
+    if is_up:
+        print('  [OK] {svc} started successfully! Status: {state} | PID: {pid}'.format(
+            svc=service, state=display_state, pid=pid))
     else:
-        print('  [FAIL] Start failed for {svc}: {err}'.format(svc=service, err=(stderr or stdout).strip()[:200]))
+        print('  [FAIL] {svc} failed to start. Status is still {state}.'.format(svc=service, state=display_state))
 
     if stdout.strip():
-        print('  >> {0}'.format(stdout.strip()[:200]))
+        print('  Stdout log:\n  ' + '\n  '.join(stdout.strip().splitlines()[:15]))
+    if stderr.strip():
+        print('  Stderr log:\n  ' + '\n  '.join(stderr.strip().splitlines()[:15]))
 
 
 def do_stop(server_key, service, servers, general):
+    import time
     sc    = servers[server_key]
     label = _env_label(server_key, servers)
     print('  Stopping {svc} on [{env}]...'.format(svc=service, env=label))
 
     stdout, stderr, rc = run_script(sc, general.get('stop_script', 'app_stop.sh'), service, general)
 
-    if rc == 0:
-        print('  [OK] Stop command sent for {0}'.format(service))
+    time.sleep(2)
+    state, pid, display_state = check_svc_status(sc, service, general)
+    
+    is_down = state.startswith('DOWN') or state == 'UNKNOWN'
+
+    if is_down:
+        print('  [OK] {svc} stopped successfully! Status: {state}'.format(svc=service, state=display_state))
     else:
-        print('  [FAIL] Stop failed for {svc}: {err}'.format(svc=service, err=(stderr or stdout).strip()[:200]))
+        print('  [FAIL] {svc} failed to stop. Status is still {state}.'.format(svc=service, state=display_state))
 
     if stdout.strip():
-        print('  >> {0}'.format(stdout.strip()[:200]))
+        print('  Stdout log:\n  ' + '\n  '.join(stdout.strip().splitlines()[:15]))
+    if stderr.strip():
+        print('  Stderr log:\n  ' + '\n  '.join(stderr.strip().splitlines()[:15]))
 
 
 def do_restart(server_key, service, servers, general):

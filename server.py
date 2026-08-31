@@ -334,17 +334,57 @@ def svc_status_all(server_key):
 
 
 def svc_start(server_key, service):
-    _, err, rc = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
-    return {'ok': rc == 0,
-            'msg': 'Start sent for {0}'.format(service) if rc == 0
-                   else 'Start failed: {0}'.format(err.strip()[:150])}
+    import time
+    out, err, rc = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
+    time.sleep(2)
+    status = svc_status(server_key, service)
+    state = status.get('state', 'UNKNOWN')
+    
+    is_up = state.startswith('UP')
+    log_detail = ""
+    if out.strip():
+        log_detail += "\nStdout:\n" + out.strip()[:400]
+    if err.strip():
+        log_detail += "\nStderr:\n" + err.strip()[:400]
+        
+    if is_up:
+        msg = '✅ <b>{0}</b> is now <b>{1}</b>!'.format(service, state)
+        if log_detail:
+            msg += '<br><pre style="font-size:11px;color:#8b949e">{0}</pre>'.format(log_detail)
+        return {'ok': True, 'msg': msg}
+    else:
+        msg = '❌ <b>{0}</b> failed to start (State: <b>{1}</b>).'.format(service, state)
+        if log_detail:
+            msg += '<br><pre style="font-size:11px;color:#f85149">{0}</pre>'.format(log_detail)
+        else:
+            msg += '<br><span style="color:#f85149">No stdout/stderr logs captured. check script availability on host.</span>'
+        return {'ok': False, 'msg': msg}
 
 
 def svc_stop(server_key, service):
-    _, err, rc = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
-    return {'ok': rc == 0,
-            'msg': 'Stop sent for {0}'.format(service) if rc == 0
-                   else 'Stop failed: {0}'.format(err.strip()[:150])}
+    import time
+    out, err, rc = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
+    time.sleep(2)
+    status = svc_status(server_key, service)
+    state = status.get('state', 'UNKNOWN')
+    
+    is_down = state.startswith('DOWN') or state == 'UNKNOWN'
+    log_detail = ""
+    if out.strip():
+        log_detail += "\nStdout:\n" + out.strip()[:400]
+    if err.strip():
+        log_detail += "\nStderr:\n" + err.strip()[:400]
+        
+    if is_down:
+        msg = '✅ <b>{0}</b> stopped successfully (State: <b>{1}</b>).'.format(service, state)
+        if log_detail:
+            msg += '<br><pre style="font-size:11px;color:#8b949e">{0}</pre>'.format(log_detail)
+        return {'ok': True, 'msg': msg}
+    else:
+        msg = '❌ <b>{0}</b> failed to stop (State: <b>{1}</b>).'.format(service, state)
+        if log_detail:
+            msg += '<br><pre style="font-size:11px;color:#f85149">{0}</pre>'.format(log_detail)
+        return {'ok': False, 'msg': msg}
 
 
 def svc_restart(server_key, service):
