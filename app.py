@@ -127,15 +127,18 @@ def _run_local(cmd):
                 pass
 
 
-def _run_remote(host, user, cmd):
+def _run_remote(host, user, cmd, password=None):
     """
     Run a shell command on a remote host via the system ssh binary.
-    Requires key-based auth (BatchMode=yes — will not prompt for password).
-    Returns (stdout_str, stderr_str, returncode).
     """
-    ssh_cmd = 'ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no {user}@{host} "{cmd}"'.format(
-        user=user, host=host, cmd=cmd.replace('"', '\\"')
-    )
+    if password:
+        ssh_cmd = 'sshpass -p "{password}" ssh -o BatchMode=no -o ConnectTimeout=10 -o StrictHostKeyChecking=no {user}@{host} "{cmd}"'.format(
+            password=password.replace('"', '\\"'), user=user, host=host, cmd=cmd.replace('"', '\\"')
+        )
+    else:
+        ssh_cmd = 'ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=no {user}@{host} "{cmd}"'.format(
+            user=user, host=host, cmd=cmd.replace('"', '\\"')
+        )
     try:
         result = subprocess.run(
             ssh_cmd, shell=True,
@@ -160,6 +163,7 @@ def run_script(server_cfg, script_name, service, general):
     host        = server_cfg.get('host.' + service, server_cfg['host'])
     user        = server_cfg.get('user.' + service, server_cfg.get('user', general.get('default_user', 'cpndev01')))
     scripts_dir = server_cfg.get('scripts_dir.' + service, server_cfg['scripts_dir'])
+    password    = server_cfg.get('password.' + service, server_cfg.get('password', None))
     
     if script_name == general.get('status_script', 'app_status.sh') and service in ('si', 'batch'):
         cmd = 'jps'
@@ -176,7 +180,7 @@ def run_script(server_cfg, script_name, service, general):
     if is_local(host):
         return _run_local(cmd)
     else:
-        return _run_remote(host, user, cmd)
+        return _run_remote(host, user, cmd, password)
 
 
 # ── Status output parsing ─────────────────────────────────────────────────────

@@ -188,10 +188,15 @@ def _run_local(cmd):
                 pass
 
 
-def _run_remote(host, user, cmd):
-    ssh = ('ssh -o BatchMode=yes -o ConnectTimeout=10 '
-           '-o StrictHostKeyChecking=no {u}@{h} "{c}"').format(
-        u=user, h=host, c=cmd.replace('"', '\\"'))
+def _run_remote(host, user, cmd, password=None):
+    if password:
+        ssh = ('sshpass -p "{p}" ssh -o BatchMode=no -o ConnectTimeout=10 '
+               '-o StrictHostKeyChecking=no {u}@{h} "{c}"').format(
+            p=password.replace('"', '\\"'), u=user, h=host, c=cmd.replace('"', '\\"'))
+    else:
+        ssh = ('ssh -o BatchMode=yes -o ConnectTimeout=10 '
+               '-o StrictHostKeyChecking=no {u}@{h} "{c}"').format(
+            u=user, h=host, c=cmd.replace('"', '\\"'))
     try:
         r = subprocess.run(ssh, shell=True,
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -210,6 +215,7 @@ def run_script(server_key, script_name, service):
     host = sc.get('host.' + service, sc['host'])
     user = sc.get('user.' + service, sc.get('user', GENERAL.get('default_user', 'cpndev01')))
     scripts_dir = sc.get('scripts_dir.' + service, sc['scripts_dir'])
+    password = sc.get('password.' + service, sc.get('password', None))
     
     if script_name == GENERAL.get('status_script', 'app_status.sh') and service in ('si', 'batch'):
         cmd = 'jps'
@@ -221,7 +227,7 @@ def run_script(server_key, script_name, service):
             actual_script = sc.get('stop_script.' + service, 'stopSI' if service == 'si' else 'stopNAPAll.sh')
         cmd = 'sh {d}/{s} {svc}'.format(d=scripts_dir, s=actual_script, svc=service)
         
-    return _run_local(cmd) if is_local(host) else _run_remote(host, user, cmd)
+    return _run_local(cmd) if is_local(host) else _run_remote(host, user, cmd, password)
 
 
 def parse_status(out):
