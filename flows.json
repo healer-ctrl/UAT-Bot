@@ -2,7 +2,7 @@
   "flows": {
     "dtcc": {
       "name": "DTCC Flow",
-      "services": ["EAI", "wmq-file-Integrator"],
+      "services": ["EAI", "wmq-file-integrator"],
       "apis": [
         "Galaxy — Security Static Data",
         "Socrate Position API",
@@ -12,7 +12,7 @@
     },
     "bloomberg": {
       "name": "Bloomberg Flow",
-      "services": ["cans", "wmq-file-Integrator"],
+      "services": ["cans", "wmq-file-integrator"],
       "apis": [
         "CANS API Actuator",
         "Galaxy — Listed Instruments (Swing)"
@@ -20,21 +20,21 @@
     },
     "swift": {
       "name": "SWIFT Flow",
-      "services": ["EAI", "wmq-file-Integrator"],
+      "services": ["EAI", "wmq-file-integrator"],
       "apis": [
         "Sirocco Outgoing Consumer"
       ]
     },
     "swing": {
       "name": "SWING Flow",
-      "services": ["EAI", "wmq-file-Integrator"],
+      "services": ["EAI", "wmq-file-integrator"],
       "apis": [
         "Galaxy — Security Static Data"
       ]
     },
     "position": {
       "name": "Position Flow",
-      "services": ["EAI", "wmq-file-Integrator"],
+      "services": ["EAI", "wmq-file-integrator"],
       "apis": [
         "Demeter API",
         "ELS / EWS Eligible Positions"
@@ -42,7 +42,7 @@
     },
     "nuvo": {
       "name": "Nuvo Flow",
-      "services": ["EAI", "wmq-file-Integrator"],
+      "services": ["EAI", "wmq-file-integrator"],
       "apis": [
         "Nuvo Gateway",
         "Quasar Naming Service",
@@ -58,7 +58,7 @@
     },
     "notifications": {
       "name": "Notifications Flow",
-      "services": ["EAI", "wmq-file-Integrator"],
+      "services": ["EAI", "wmq-file-integrator"],
       "apis": [
         "Sirocco Outgoing Consumer"
       ]

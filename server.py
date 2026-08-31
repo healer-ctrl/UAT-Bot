@@ -1426,7 +1426,6 @@ setInterval(refreshDash, 60000);
 
 // ── Quick actions from dashboard buttons ──────────────────────────────────────
 function quickAction(intent, service, envKey){
-  if(busy) return;
   var payload = '__action__:' + intent + ':' + service + ':' + envKey;
   userMsg(intent.charAt(0).toUpperCase() + intent.slice(1) + ' ' + service + ' [' + envLabel(envKey) + ']');
   postChat(payload, envKey);
@@ -1436,40 +1435,61 @@ function quickAction(intent, service, envKey){
 function sendMsg(){
   var input = document.getElementById('msg-input');
   var text  = input.value.trim();
-  if(!text || busy) return;
+  if(!text) return;
   input.value = '';
   userMsg(text);
   postChat(text, currentEnv);
 }
 
 function sendQuick(text){
-  if(busy) return;
   userMsg(text);
   postChat(text, currentEnv);
 }
 
+var chatQueue = [];
+var processingQueue = false;
+
 function postChat(text, env){
+  chatQueue.push({text: text, env: env});
+  processChatQueue();
+}
+
+function processChatQueue(){
+  if (processingQueue || chatQueue.length === 0) {
+    if (chatQueue.length === 0) {
+      setBusy(false);
+    }
+    return;
+  }
+  processingQueue = true;
   setBusy(true);
+  
+  var next = chatQueue.shift();
   var thinking = botMsg('<span class="spinning">&#8635;</span> thinking...', true);
+  
   fetch('/api/chat', {
     method:  'POST',
     headers: {'Content-Type': 'application/json'},
-    body:    JSON.stringify({message: text, env: env})
+    body:    JSON.stringify({message: next.text, env: next.env})
   })
   .then(function(r){ return r.json(); })
   .then(function(data){
     thinking.remove();
     renderResponse(data);
+    
     // Refresh dashboard after any action
-    if(text.indexOf('__action__') === 0 || /start|stop|restart/i.test(text)){
+    if(next.text.indexOf('__action__') === 0 || /start|stop|restart/i.test(next.text)){
       setTimeout(refreshDash, 1500);
     }
-    setBusy(false);
+    
+    processingQueue = false;
+    processChatQueue();
   })
   .catch(function(e){
     thinking.remove();
     botMsg('&#10060; Error: ' + e);
-    setBusy(false);
+    processingQueue = false;
+    processChatQueue();
   });
 }
 
@@ -1528,35 +1548,6 @@ function setBusy(b){
   busy = b;
   document.getElementById('send-btn').disabled  = b;
   document.getElementById('msg-input').disabled = b;
-  
-  // Disable/enable dashboard action buttons
-  document.querySelectorAll('.action-cell button').forEach(function(btn){
-    btn.disabled = b;
-    btn.style.opacity = b ? '0.4' : '1';
-    btn.style.cursor = b ? 'default' : 'pointer';
-  });
-  
-  // Disable/enable quick buttons
-  document.querySelectorAll('.qbtn').forEach(function(btn){
-    btn.disabled = b;
-    btn.style.opacity = b ? '0.4' : '1';
-    btn.style.cursor = b ? 'default' : 'pointer';
-  });
-
-  // Disable/enable env buttons
-  document.querySelectorAll('.env-btn').forEach(function(btn){
-    btn.disabled = b;
-    btn.style.opacity = b ? '0.4' : '1';
-    btn.style.cursor = b ? 'default' : 'pointer';
-  });
-  
-  // Disable/enable refresh button
-  var ref = document.getElementById('refresh-btn');
-  if(ref) {
-    ref.disabled = b;
-    ref.style.opacity = b ? '0.4' : '1';
-    ref.style.cursor = b ? 'default' : 'pointer';
-  }
 }
 
 // ── Enter key ─────────────────────────────────────────────────────────────────
@@ -1678,7 +1669,7 @@ class Handler(BaseHTTPRequestHandler):
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8099
     host = '0.0.0.0'
 
     server = ThreadedHTTPServer((host, port), Handler)
