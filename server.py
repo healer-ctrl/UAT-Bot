@@ -307,8 +307,8 @@ def get_pid(out):
 # ── Service actions ───────────────────────────────────────────────────────────
 
 def svc_status(server_key, service):
-    out, err, _ = run_script(server_key, GENERAL.get('status_script', 'app_status.sh'), service)
-    if err.strip() and not out.strip():
+    out, err, rc = run_script(server_key, GENERAL.get('status_script', 'app_status.sh'), service)
+    if rc != 0 and err.strip():
         return {'state': 'ERROR', 'pid': '-', 'err': err.strip()[:200]}
     
     if service == 'si':
@@ -394,9 +394,10 @@ def svc_stop(server_key, service):
 
 def svc_restart(server_key, service):
     out_stop, err_stop, rc_stop = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
-    out_start, err_start, rc_start = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
-    
     import time
+    time.sleep(2)
+    
+    out_start, err_start, rc_start = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
     time.sleep(2)
     
     status = svc_status(server_key, service)

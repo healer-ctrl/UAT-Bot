@@ -277,8 +277,8 @@ def _env_label(server_key, servers):
 
 
 def check_svc_status(server_cfg, service, general):
-    stdout, stderr, _ = run_script(server_cfg, general.get('status_script', 'app_status.sh'), service, general)
-    if stderr.strip() and not stdout.strip():
+    stdout, stderr, rc = run_script(server_cfg, general.get('status_script', 'app_status.sh'), service, general)
+    if rc != 0 and stderr.strip():
         return 'ERROR', '-', stderr.strip()[:200]
         
     if service == 'si':
