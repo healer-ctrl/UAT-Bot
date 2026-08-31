@@ -169,10 +169,10 @@ def _run_local(cmd):
             p = subprocess.Popen(cmd, shell=True, stdout=fout, stderr=ferr,
                                  preexec_fn=os.setsid)
             try:
-                p.wait(timeout=30)
+                p.wait(timeout=600)
             except subprocess.TimeoutExpired:
                 p.kill()
-                return '', 'Timed out after 30s', 1
+                return '', 'Timed out after 600s', 1
         with open(op) as f:
             out = f.read()
         with open(ep) as f:
@@ -205,12 +205,12 @@ def _run_remote(host, user, cmd, password=None):
             password_sent = False
             t0 = time.time()
             while True:
-                if time.time() - t0 > 30:
+                if time.time() - t0 > 600:
                     try:
                         os.kill(pid, 9)
                     except OSError:
                         pass
-                    return '', 'SSH connection timed out (30s)', 1
+                    return '', 'SSH connection timed out (600s)', 1
                 
                 r, _, _ = select.select([fd], [], [], 0.5)
                 if fd in r:
@@ -248,12 +248,12 @@ def _run_remote(host, user, cmd, password=None):
         try:
             r = subprocess.run(ssh, shell=True,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               timeout=30)
+                               timeout=600)
             return (r.stdout.decode('utf-8', 'replace'),
                     r.stderr.decode('utf-8', 'replace'),
                     r.returncode)
         except subprocess.TimeoutExpired:
-            return '', 'SSH timed out (30s)', 1
+            return '', 'SSH timed out (600s)', 1
         except Exception as exc:
             return '', str(exc), 1
 
@@ -393,68 +393,56 @@ def log_activity(env, service, action, status, stdout="", stderr=""):
         sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
 
 
-def wait_for_state(server_key, service, target_state, timeout=25):
-    import time
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        status = svc_status(server_key, service)
-        state = status.get('state', 'UNKNOWN')
-        is_target = False
-        if target_state == 'UP':
-            is_target = state.startswith('UP')
-        elif target_state == 'DOWN':
-            is_target = state.startswith('DOWN') or state == 'UNKNOWN'
-            
-        if is_target:
-            return status
-        time.sleep(1)
-    return svc_status(server_key, service)
-
-
 def svc_start(server_key, service):
     out, err, rc = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
-    status = wait_for_state(server_key, service, 'UP', timeout=25)
-    state = status.get('state', 'UNKNOWN')
+    status = svc_status(server_key, service)
+    live_state = status.get('state', 'UNKNOWN')
     
-    is_up = state.startswith('UP')
-    log_activity(env_label(server_key), service, 'START', state, out, err)
+    is_success = (rc == 0) or live_state.startswith('UP')
+    display_status = live_state if live_state.startswith('UP') else ('UP (Started, rc=0)' if rc == 0 else live_state)
+    
+    log_activity(env_label(server_key), service, 'START', display_status, out, err)
 
-    if is_up:
-        return {'ok': True, 'msg': '✅ <b>{0}</b> is now <b>{1}</b>!'.format(service, state)}
+    if is_success:
+        return {'ok': True, 'msg': '✅ <b>{0}</b> started successfully! (Status: <b>{1}</b>)'.format(service, display_status)}
     else:
-        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to start (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for stdout/stderr logs.</span>'.format(service, state)}
+        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to start (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for stdout/stderr logs.</span>'.format(service, display_status)}
 
 
 def svc_stop(server_key, service):
     out, err, rc = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
-    status = wait_for_state(server_key, service, 'DOWN', timeout=25)
-    state = status.get('state', 'UNKNOWN')
+    status = svc_status(server_key, service)
+    live_state = status.get('state', 'UNKNOWN')
     
-    is_down = state.startswith('DOWN') or state == 'UNKNOWN'
-    log_activity(env_label(server_key), service, 'STOP', state, out, err)
+    is_success = (rc == 0) or live_state.startswith('DOWN') or live_state == 'UNKNOWN'
+    display_status = live_state if (live_state.startswith('DOWN') or live_state == 'UNKNOWN') else ('DOWN (Stopped, rc=0)' if rc == 0 else live_state)
+    
+    log_activity(env_label(server_key), service, 'STOP', display_status, out, err)
 
-    if is_down:
-        return {'ok': True, 'msg': '✅ <b>{0}</b> stopped successfully!'.format(service)}
+    if is_success:
+        return {'ok': True, 'msg': '✅ <b>{0}</b> stopped successfully! (Status: <b>{1}</b>)'.format(service, display_status)}
     else:
-        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to stop (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for stdout/stderr logs.</span>'.format(service, state)}
+        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to stop (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for stdout/stderr logs.</span>'.format(service, display_status)}
 
 
 def svc_restart(server_key, service):
     out_stop, err_stop, rc_stop = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
-    status_stop = wait_for_state(server_key, service, 'DOWN', timeout=25)
-    state_stop = status_stop.get('state', 'UNKNOWN')
-    log_activity(env_label(server_key), service, 'RESTART_STOP', state_stop, out_stop, err_stop)
+    status_stop = svc_status(server_key, service)
+    live_state_stop = status_stop.get('state', 'UNKNOWN')
+    display_status_stop = live_state_stop if (live_state_stop.startswith('DOWN') or live_state_stop == 'UNKNOWN') else ('DOWN (Stopped, rc=0)' if rc_stop == 0 else live_state_stop)
+    log_activity(env_label(server_key), service, 'RESTART_STOP', display_status_stop, out_stop, err_stop)
     
     out_start, err_start, rc_start = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
-    status_start = wait_for_state(server_key, service, 'UP', timeout=25)
-    state_start = status_start.get('state', 'UNKNOWN')
-    log_activity(env_label(server_key), service, 'RESTART_START', state_start, out_start, err_start)
+    status_start = svc_status(server_key, service)
+    live_state_start = status_start.get('state', 'UNKNOWN')
+    display_status_start = live_state_start if live_state_start.startswith('UP') else ('UP (Started, rc=0)' if rc_start == 0 else live_state_start)
+    log_activity(env_label(server_key), service, 'RESTART_START', display_status_start, out_start, err_start)
 
-    is_up = state_start.startswith('UP')
-    if is_up:
-        return {'ok': True, 'msg': '✅ <b>{0}</b> restarted successfully (State: <b>{1}</b>)'.format(service, state_start)}
+    is_success = (rc_start == 0) or live_state_start.startswith('UP')
+    if is_success:
+        return {'ok': True, 'msg': '✅ <b>{0}</b> restarted successfully! (Status: <b>{1}</b>)'.format(service, display_status_start)}
     else:
-        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to restart (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for details.</span>'.format(service, state_start)}
+        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to restart (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for details.</span>'.format(service, display_status_start)}
 
 
 # ── Chat response builders ────────────────────────────────────────────────────

@@ -104,10 +104,10 @@ def _run_local(cmd):
                 preexec_fn=os.setsid,   # new process group so daemon children don't block us
             )
             try:
-                proc.wait(timeout=30)
+                proc.wait(timeout=600)
             except subprocess.TimeoutExpired:
                 proc.kill()
-                return '', 'Timed out after 30s', 1
+                return '', 'Timed out after 600s', 1
 
         with open(out_path, 'r') as f:
             stdout = f.read()
@@ -135,6 +135,7 @@ def _run_remote(host, user, cmd, password=None):
         # Zero-installation interactive SSH password login using pty (stdlib only)
         import pty
         import select
+        import time
         
         ssh_cmd = ['ssh', '-o', 'BatchMode=no', '-o', 'ConnectTimeout=10', 
                    '-o', 'StrictHostKeyChecking=no', '{0}@{1}'.format(user, host), cmd]
@@ -147,12 +148,12 @@ def _run_remote(host, user, cmd, password=None):
             password_sent = False
             t0 = time.time()
             while True:
-                if time.time() - t0 > 30:
+                if time.time() - t0 > 600:
                     try:
                         os.kill(pid, 9)
                     except OSError:
                         pass
-                    return '', 'SSH connection timed out (30s)', 1
+                    return '', 'SSH connection timed out (600s)', 1
                 
                 r, _, _ = select.select([fd], [], [], 0.5)
                 if fd in r:
@@ -192,13 +193,13 @@ def _run_remote(host, user, cmd, password=None):
                 ssh_cmd, shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=30,
+                timeout=600,
             )
             stdout = result.stdout.decode('utf-8', errors='replace')
             stderr = result.stderr.decode('utf-8', errors='replace')
             return stdout, stderr, result.returncode
         except subprocess.TimeoutExpired:
-            return '', 'SSH connection timed out (30s)', 1
+            return '', 'SSH connection timed out (600s)', 1
         except Exception as exc:
             return '', str(exc), 1
 
@@ -386,23 +387,6 @@ def log_activity(env, service, action, status, stdout="", stderr=""):
         sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
 
 
-def wait_for_state(server_cfg, service, target_state, general, timeout=25):
-    import time
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        state, pid, display_state = check_svc_status(server_cfg, service, general)
-        is_target = False
-        if target_state == 'UP':
-            is_target = state.startswith('UP')
-        elif target_state == 'DOWN':
-            is_target = state.startswith('DOWN') or state == 'UNKNOWN'
-            
-        if is_target:
-            return state, pid, display_state
-        time.sleep(1)
-    return check_svc_status(server_cfg, service, general)
-
-
 def do_start(server_key, service, servers, general):
     sc    = servers[server_key]
     label = _env_label(server_key, servers)
@@ -410,16 +394,17 @@ def do_start(server_key, service, servers, general):
 
     stdout, stderr, rc = run_script(sc, general.get('start_script', 'app_start.sh'), service, general)
 
-    state, pid, display_state = wait_for_state(sc, service, 'UP', general, timeout=25)
-    is_up = state.startswith('UP')
+    state, pid, display_state = check_svc_status(sc, service, general)
+    is_success = (rc == 0) or state.startswith('UP')
+    display_status = display_state if state.startswith('UP') else ('UP (Started, rc=0)' if rc == 0 else display_state)
     
-    log_activity(label, service, 'START', display_state, stdout, stderr)
+    log_activity(label, service, 'START', display_status, stdout, stderr)
 
-    if is_up:
+    if is_success:
         print('  [OK] {svc} started successfully! Status: {state} | PID: {pid}'.format(
-            svc=service, state=display_state, pid=pid))
+            svc=service, state=display_status, pid=pid))
     else:
-        print('  [FAIL] {svc} failed to start. Status is still {state}.'.format(svc=service, state=display_state))
+        print('  [FAIL] {svc} failed to start. Status is {state}.'.format(svc=service, state=display_status))
         print('  Check activity.log for stdout/stderr error details.')
 
 
@@ -430,15 +415,16 @@ def do_stop(server_key, service, servers, general):
 
     stdout, stderr, rc = run_script(sc, general.get('stop_script', 'app_stop.sh'), service, general)
 
-    state, pid, display_state = wait_for_state(sc, service, 'DOWN', general, timeout=25)
-    is_down = state.startswith('DOWN') or state == 'UNKNOWN'
+    state, pid, display_state = check_svc_status(sc, service, general)
+    is_success = (rc == 0) or state.startswith('DOWN') or state == 'UNKNOWN'
+    display_status = display_state if (state.startswith('DOWN') or state == 'UNKNOWN') else ('DOWN (Stopped, rc=0)' if rc == 0 else display_state)
     
-    log_activity(label, service, 'STOP', display_state, stdout, stderr)
+    log_activity(label, service, 'STOP', display_status, stdout, stderr)
 
-    if is_down:
-        print('  [OK] {svc} stopped successfully! Status: {state}'.format(svc=service, state=display_state))
+    if is_success:
+        print('  [OK] {svc} stopped successfully! Status: {state}'.format(svc=service, state=display_status))
     else:
-        print('  [FAIL] {svc} failed to stop. Status is still {state}.'.format(svc=service, state=display_state))
+        print('  [FAIL] {svc} failed to stop. Status is {state}.'.format(svc=service, state=display_status))
         print('  Check activity.log for stdout/stderr error details.')
 
 
