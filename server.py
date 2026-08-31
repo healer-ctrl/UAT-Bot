@@ -333,6 +333,33 @@ def svc_status_all(server_key):
     return results
 
 
+def log_activity(env, service, action, status, stdout="", stderr=""):
+    import datetime
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_line = (
+        "======================================================================\n"
+        "Timestamp   : {0}\n"
+        "Environment : {1}\n"
+        "Service     : {2}\n"
+        "Action      : {3}\n"
+        "Status      : {4}\n"
+    ).format(timestamp, env, service, action, status)
+    
+    if stdout.strip():
+        log_line += "Stdout      :\n{0}\n".format(stdout.strip())
+    if stderr.strip():
+        log_line += "Stderr      :\n{0}\n".format(stderr.strip())
+        
+    log_line += "======================================================================\n\n"
+    
+    try:
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'activity.log')
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(log_line)
+    except Exception as exc:
+        sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
+
+
 def svc_start(server_key, service):
     import time
     out, err, rc = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
@@ -341,24 +368,12 @@ def svc_start(server_key, service):
     state = status.get('state', 'UNKNOWN')
     
     is_up = state.startswith('UP')
-    log_detail = ""
-    if out.strip():
-        log_detail += "\nStdout:\n" + out.strip()[:400]
-    if err.strip():
-        log_detail += "\nStderr:\n" + err.strip()[:400]
-        
+    log_activity(env_label(server_key), service, 'START', state, out, err)
+
     if is_up:
-        msg = '✅ <b>{0}</b> is now <b>{1}</b>!'.format(service, state)
-        if log_detail:
-            msg += '<br><pre style="font-size:11px;color:#8b949e">{0}</pre>'.format(log_detail)
-        return {'ok': True, 'msg': msg}
+        return {'ok': True, 'msg': '✅ <b>{0}</b> is now <b>{1}</b>!'.format(service, state)}
     else:
-        msg = '❌ <b>{0}</b> failed to start (State: <b>{1}</b>).'.format(service, state)
-        if log_detail:
-            msg += '<br><pre style="font-size:11px;color:#f85149">{0}</pre>'.format(log_detail)
-        else:
-            msg += '<br><span style="color:#f85149">No stdout/stderr logs captured. check script availability on host.</span>'
-        return {'ok': False, 'msg': msg}
+        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to start (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for stdout/stderr logs.</span>'.format(service, state)}
 
 
 def svc_stop(server_key, service):
@@ -369,28 +384,32 @@ def svc_stop(server_key, service):
     state = status.get('state', 'UNKNOWN')
     
     is_down = state.startswith('DOWN') or state == 'UNKNOWN'
-    log_detail = ""
-    if out.strip():
-        log_detail += "\nStdout:\n" + out.strip()[:400]
-    if err.strip():
-        log_detail += "\nStderr:\n" + err.strip()[:400]
-        
+    log_activity(env_label(server_key), service, 'STOP', state, out, err)
+
     if is_down:
-        msg = '✅ <b>{0}</b> stopped successfully (State: <b>{1}</b>).'.format(service, state)
-        if log_detail:
-            msg += '<br><pre style="font-size:11px;color:#8b949e">{0}</pre>'.format(log_detail)
-        return {'ok': True, 'msg': msg}
+        return {'ok': True, 'msg': '✅ <b>{0}</b> stopped successfully!'.format(service)}
     else:
-        msg = '❌ <b>{0}</b> failed to stop (State: <b>{1}</b>).'.format(service, state)
-        if log_detail:
-            msg += '<br><pre style="font-size:11px;color:#f85149">{0}</pre>'.format(log_detail)
-        return {'ok': False, 'msg': msg}
+        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to stop (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for stdout/stderr logs.</span>'.format(service, state)}
 
 
 def svc_restart(server_key, service):
-    r1 = svc_stop(server_key, service)
-    r2 = svc_start(server_key, service)
-    return {'ok': r2['ok'], 'msg': '{0} → {1}'.format(r1['msg'], r2['msg'])}
+    out_stop, err_stop, rc_stop = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
+    out_start, err_start, rc_start = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
+    
+    import time
+    time.sleep(2)
+    
+    status = svc_status(server_key, service)
+    state = status.get('state', 'UNKNOWN')
+    is_up = state.startswith('UP')
+    
+    log_activity(env_label(server_key), service, 'RESTART_STOP', state, out_stop, err_stop)
+    log_activity(env_label(server_key), service, 'RESTART_START', state, out_start, err_start)
+
+    if is_up:
+        return {'ok': True, 'msg': '✅ <b>{0}</b> restarted successfully (State: <b>{1}</b>)'.format(service, state)}
+    else:
+        return {'ok': False, 'msg': '❌ <b>{0}</b> failed to restart (State: <b>{1}</b>). <span style="font-size:11px;color:var(--muted)">Check activity.log for details.</span>'.format(service, state)}
 
 
 # ── Chat response builders ────────────────────────────────────────────────────

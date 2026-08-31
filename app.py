@@ -337,6 +337,33 @@ def do_status_all(server_key, servers, general):
         up=up_count, total=len(services), env=label))
 
 
+def log_activity(env, service, action, status, stdout="", stderr=""):
+    import datetime
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    log_line = (
+        "======================================================================\n"
+        "Timestamp   : {0}\n"
+        "Environment : {1}\n"
+        "Service     : {2}\n"
+        "Action      : {3}\n"
+        "Status      : {4}\n"
+    ).format(timestamp, env, service, action, status)
+    
+    if stdout.strip():
+        log_line += "Stdout      :\n{0}\n".format(stdout.strip())
+    if stderr.strip():
+        log_line += "Stderr      :\n{0}\n".format(stderr.strip())
+        
+    log_line += "======================================================================\n\n"
+    
+    try:
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'activity.log')
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(log_line)
+    except Exception as exc:
+        sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
+
+
 def do_start(server_key, service, servers, general):
     import time
     sc    = servers[server_key]
@@ -347,19 +374,16 @@ def do_start(server_key, service, servers, general):
 
     time.sleep(2)
     state, pid, display_state = check_svc_status(sc, service, general)
-    
     is_up = state.startswith('UP')
     
+    log_activity(label, service, 'START', display_state, stdout, stderr)
+
     if is_up:
         print('  [OK] {svc} started successfully! Status: {state} | PID: {pid}'.format(
             svc=service, state=display_state, pid=pid))
     else:
         print('  [FAIL] {svc} failed to start. Status is still {state}.'.format(svc=service, state=display_state))
-
-    if stdout.strip():
-        print('  Stdout log:\n  ' + '\n  '.join(stdout.strip().splitlines()[:15]))
-    if stderr.strip():
-        print('  Stderr log:\n  ' + '\n  '.join(stderr.strip().splitlines()[:15]))
+        print('  Check activity.log for stdout/stderr error details.')
 
 
 def do_stop(server_key, service, servers, general):
@@ -372,18 +396,15 @@ def do_stop(server_key, service, servers, general):
 
     time.sleep(2)
     state, pid, display_state = check_svc_status(sc, service, general)
-    
     is_down = state.startswith('DOWN') or state == 'UNKNOWN'
+    
+    log_activity(label, service, 'STOP', display_state, stdout, stderr)
 
     if is_down:
         print('  [OK] {svc} stopped successfully! Status: {state}'.format(svc=service, state=display_state))
     else:
         print('  [FAIL] {svc} failed to stop. Status is still {state}.'.format(svc=service, state=display_state))
-
-    if stdout.strip():
-        print('  Stdout log:\n  ' + '\n  '.join(stdout.strip().splitlines()[:15]))
-    if stderr.strip():
-        print('  Stderr log:\n  ' + '\n  '.join(stderr.strip().splitlines()[:15]))
+        print('  Check activity.log for stdout/stderr error details.')
 
 
 def do_restart(server_key, service, servers, general):
