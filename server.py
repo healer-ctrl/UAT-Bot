@@ -258,6 +258,16 @@ def _run_remote(host, user, cmd, password=None):
             return '', str(exc), 1
 
 
+def wrap_env_cmd(cmd):
+    return (
+        "source /etc/profile 2>/dev/null; "
+        "source ~/.bash_profile 2>/dev/null; "
+        "source ~/.bashrc 2>/dev/null; "
+        "export PATH=$PATH:/usr/java/latest/bin:/usr/lib/jvm/java/bin:/usr/bin:/usr/local/bin; "
+        + cmd
+    )
+
+
 def run_script(server_key, script_name, service):
     sc = SERVERS[server_key]
     host = sc.get('host.' + service, sc['host'])
@@ -285,7 +295,8 @@ def run_script(server_key, script_name, service):
                 actual_script = sc.get('stop_script.' + service, 'app_stop.sh')
         cmd = 'cd {d} && sh {s} {svc}'.format(d=scripts_dir, s=actual_script, svc=service)
         
-    return _run_local(cmd) if is_local(host) else _run_remote(host, user, cmd, password)
+    wrapped_cmd = wrap_env_cmd(cmd)
+    return _run_local(wrapped_cmd) if is_local(host) else _run_remote(host, user, wrapped_cmd, password)
 
 
 def parse_status(out):

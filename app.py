@@ -203,6 +203,16 @@ def _run_remote(host, user, cmd, password=None):
             return '', str(exc), 1
 
 
+def wrap_env_cmd(cmd):
+    return (
+        "source /etc/profile 2>/dev/null; "
+        "source ~/.bash_profile 2>/dev/null; "
+        "source ~/.bashrc 2>/dev/null; "
+        "export PATH=$PATH:/usr/java/latest/bin:/usr/lib/jvm/java/bin:/usr/bin:/usr/local/bin; "
+        + cmd
+    )
+
+
 def run_script(server_cfg, script_name, service, general):
     """
     Build the shell command and dispatch to local or remote runner.
@@ -235,10 +245,11 @@ def run_script(server_cfg, script_name, service, general):
             dir=scripts_dir, script=actual_script, svc=service
         )
 
+    wrapped_cmd = wrap_env_cmd(cmd)
     if is_local(host):
-        return _run_local(cmd)
+        return _run_local(wrapped_cmd)
     else:
-        return _run_remote(host, user, cmd, password)
+        return _run_remote(host, user, wrapped_cmd, password)
 
 
 # -- Status output parsing -----------------------------------------------------
