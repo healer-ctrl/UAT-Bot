@@ -371,11 +371,27 @@ def log_activity(env, service, action, status, stdout="", stderr=""):
         sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
 
 
-def svc_start(server_key, service):
+def wait_for_state(server_key, service, target_state, timeout=10):
     import time
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        status = svc_status(server_key, service)
+        state = status.get('state', 'UNKNOWN')
+        is_target = False
+        if target_state == 'UP':
+            is_target = state.startswith('UP')
+        elif target_state == 'DOWN':
+            is_target = state.startswith('DOWN') or state == 'UNKNOWN'
+            
+        if is_target:
+            return status
+        time.sleep(1)
+    return svc_status(server_key, service)
+
+
+def svc_start(server_key, service):
     out, err, rc = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
-    time.sleep(2)
-    status = svc_status(server_key, service)
+    status = wait_for_state(server_key, service, 'UP', timeout=10)
     state = status.get('state', 'UNKNOWN')
     
     is_up = state.startswith('UP')
@@ -388,10 +404,8 @@ def svc_start(server_key, service):
 
 
 def svc_stop(server_key, service):
-    import time
     out, err, rc = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
-    time.sleep(2)
-    status = svc_status(server_key, service)
+    status = wait_for_state(server_key, service, 'DOWN', timeout=10)
     state = status.get('state', 'UNKNOWN')
     
     is_down = state.startswith('DOWN') or state == 'UNKNOWN'
@@ -405,13 +419,11 @@ def svc_stop(server_key, service):
 
 def svc_restart(server_key, service):
     out_stop, err_stop, rc_stop = run_script(server_key, GENERAL.get('stop_script', 'app_stop.sh'), service)
-    import time
-    time.sleep(2)
+    wait_for_state(server_key, service, 'DOWN', timeout=10)
     
     out_start, err_start, rc_start = run_script(server_key, GENERAL.get('start_script', 'app_start.sh'), service)
-    time.sleep(2)
+    status = wait_for_state(server_key, service, 'UP', timeout=10)
     
-    status = svc_status(server_key, service)
     state = status.get('state', 'UNKNOWN')
     is_up = state.startswith('UP')
     

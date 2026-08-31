@@ -375,16 +375,31 @@ def log_activity(env, service, action, status, stdout="", stderr=""):
         sys.stderr.write("Failed to write activity.log: " + str(exc) + "\n")
 
 
-def do_start(server_key, service, servers, general):
+def wait_for_state(server_cfg, service, target_state, general, timeout=10):
     import time
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        state, pid, display_state = check_svc_status(server_cfg, service, general)
+        is_target = False
+        if target_state == 'UP':
+            is_target = state.startswith('UP')
+        elif target_state == 'DOWN':
+            is_target = state.startswith('DOWN') or state == 'UNKNOWN'
+            
+        if is_target:
+            return state, pid, display_state
+        time.sleep(1)
+    return check_svc_status(server_cfg, service, general)
+
+
+def do_start(server_key, service, servers, general):
     sc    = servers[server_key]
     label = _env_label(server_key, servers)
     print('  Starting {svc} on [{env}]...'.format(svc=service, env=label))
 
     stdout, stderr, rc = run_script(sc, general.get('start_script', 'app_start.sh'), service, general)
 
-    time.sleep(2)
-    state, pid, display_state = check_svc_status(sc, service, general)
+    state, pid, display_state = wait_for_state(sc, service, 'UP', general, timeout=10)
     is_up = state.startswith('UP')
     
     log_activity(label, service, 'START', display_state, stdout, stderr)
@@ -398,15 +413,13 @@ def do_start(server_key, service, servers, general):
 
 
 def do_stop(server_key, service, servers, general):
-    import time
     sc    = servers[server_key]
     label = _env_label(server_key, servers)
     print('  Stopping {svc} on [{env}]...'.format(svc=service, env=label))
 
     stdout, stderr, rc = run_script(sc, general.get('stop_script', 'app_stop.sh'), service, general)
 
-    time.sleep(2)
-    state, pid, display_state = check_svc_status(sc, service, general)
+    state, pid, display_state = wait_for_state(sc, service, 'DOWN', general, timeout=10)
     is_down = state.startswith('DOWN') or state == 'UNKNOWN'
     
     log_activity(label, service, 'STOP', display_state, stdout, stderr)
