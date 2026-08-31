@@ -1,0 +1,67 @@
+{
+  "flows": {
+    "dtcc": {
+      "name": "DTCC Flow",
+      "services": ["EAI", "wmq-file-Integrator"],
+      "apis": [
+        "Galaxy — Security Static Data",
+        "Socrate Position API",
+        "Pegasus Position Search",
+        "ELS / EWS Eligible Positions"
+      ]
+    },
+    "bloomberg": {
+      "name": "Bloomberg Flow",
+      "services": ["cans", "wmq-file-Integrator"],
+      "apis": [
+        "CANS API Actuator",
+        "Galaxy — Listed Instruments (Swing)"
+      ]
+    },
+    "swift": {
+      "name": "SWIFT Flow",
+      "services": ["EAI", "wmq-file-Integrator"],
+      "apis": [
+        "Sirocco Outgoing Consumer"
+      ]
+    },
+    "swing": {
+      "name": "SWING Flow",
+      "services": ["EAI", "wmq-file-Integrator"],
+      "apis": [
+        "Galaxy — Security Static Data"
+      ]
+    },
+    "position": {
+      "name": "Position Flow",
+      "services": ["EAI", "wmq-file-Integrator"],
+      "apis": [
+        "Demeter API",
+        "ELS / EWS Eligible Positions"
+      ]
+    },
+    "nuvo": {
+      "name": "Nuvo Flow",
+      "services": ["EAI", "wmq-file-Integrator"],
+      "apis": [
+        "Nuvo Gateway",
+        "Quasar Naming Service",
+        "SDS Server"
+      ]
+    },
+    "gcopy": {
+      "name": "GCopy Flow",
+      "services": ["EAI"],
+      "apis": [
+        "Galaxy — GCopy (Manage Corporate Actions)"
+      ]
+    },
+    "notifications": {
+      "name": "Notifications Flow",
+      "services": ["EAI", "wmq-file-Integrator"],
+      "apis": [
+        "Sirocco Outgoing Consumer"
+      ]
+    }
+  }
+}

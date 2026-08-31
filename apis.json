@@ -1,0 +1,215 @@
+{
+  "_comment": "APIs to health-check. credentials + URLs are fetched from Vault at runtime. No secrets here.",
+
+  "apis": [
+
+    {
+      "name":    "Galaxy — Security Static Data",
+      "aliases": ["galaxy", "galaxy ssd", "galaxy security", "ssd", "security static data"],
+      "team":    "Galaxy Team",
+      "contact": "Reach out to #galaxy-team",
+
+      "auth": {
+        "type":               "oauth2_vault",
+        "client_id_key":      "booking.get_security_static_data.sgconnect.clientId",
+        "client_secret_key":  "booking.get_security_static_data.sgconnect.clientSecret",
+        "token_url_key":      "booking.get_security_static_data.sgconnect.access.token.uri",
+        "scopes_key":         "booking.get_security_static_data.sgconnect.token.scopes"
+      },
+
+      "health_url_key": "booking.get_security_static_data.endpoint.url",
+      "timeout_sec":    10
+    },
+
+    {
+      "name":    "Galaxy — Listed Instruments (Swing)",
+      "aliases": ["galaxy instruments", "galaxy swing", "swing", "listed instruments", "swing gateway"],
+      "team":    "Galaxy Team",
+      "contact": "Reach out to #galaxy-team",
+
+      "auth": {
+        "type":               "oauth2_vault",
+        "client_id_key":      "instrument.galaxy.gateway.sgconnect.clientId",
+        "client_secret_key":  "instrument.galaxy.gateway.sgconnect.clientSecret",
+        "token_url_key":      "instrument.galaxy.gateway.sgconnect.access.token.uri",
+        "scopes_key":         "instrument.galaxy.gateway.sgconnect.token.scopes"
+      },
+
+      "health_url_key": "instrument.galaxy.gateway.endpoint.url",
+      "timeout_sec":    10
+    },
+
+    {
+      "name":    "Galaxy — GCopy (Manage Corporate Actions)",
+      "aliases": ["galaxy gcopy", "gcopy", "galaxy ca", "manage corporate actions"],
+      "team":    "Galaxy Team",
+      "contact": "Reach out to #galaxy-team",
+
+      "auth": {
+        "type":               "oauth2_vault",
+        "client_id_key":      "gcopy.gateway.sgconnect.clientId",
+        "client_secret_key":  "gcopy.gateway.sgconnect.clientSecret",
+        "token_url_key":      "gcopy.gateway.sgconnect.access.token.uri",
+        "scopes_key":         "gcopy.gateway.sgconnect.token.scopes"
+      },
+
+      "health_url_key": "gcopy.gateway.endpoint.url",
+      "timeout_sec":    10
+    },
+
+    {
+      "name":    "Nuvo Gateway",
+      "aliases": ["nuvo", "nuvo gateway", "nuvo flow", "pegasus nuvo", "swap scale"],
+      "team":    "Nuvo / Pegasus Team",
+      "contact": "Reach out to #nuvo-team or Pegasus team",
+
+      "auth": {
+        "type":               "oauth2_vault",
+        "client_id_key":      "nuvo.gateway.sgconnect.clientId",
+        "client_secret_key":  "nuvo.gateway.sgconnect.clientSecret",
+        "token_url_key":      "nuvo.gateway.sgconnect.access.token.uri",
+        "scopes_key":         "nuvo.gateway.sgconnect.token.scopes"
+      },
+
+      "health_url_key": "nuvo.gateway.endpoint.url",
+      "timeout_sec":    10
+    },
+
+    {
+      "name":    "Sirocco Outgoing Consumer",
+      "aliases": ["sirocco", "sirocco gateway", "outgoing docs"],
+      "team":    "Sirocco Team",
+      "contact": "Reach out to Sirocco team",
+
+      "auth": {
+        "type":               "oauth2_vault",
+        "client_id_key":      "sirocco.gateway.sgconnect.clientId",
+        "client_secret_key":  "sirocco.gateway.sgconnect.clientSecret",
+        "token_url_key":      "sirocco.gateway.sgconnect.access.token.uri",
+        "scopes_key":         "sirocco.gateway.sgconnect.token.scopes"
+      },
+
+      "health_url_key": "sirocco.gateway.endpoint.url",
+      "timeout_sec":    10
+    },
+
+    {
+      "name":    "Pegasus Position Search",
+      "aliases": ["pegasus", "position search", "pegasus position"],
+      "team":    "Pegasus Team",
+      "contact": "Reach out to #pegasus-team",
+
+      "auth": {
+        "type":               "oauth2_vault",
+        "client_id_key":      "pegasus.sgconnect.clientId",
+        "client_secret_key":  "pegasus.sgconnect.clientSecret",
+        "token_url_key":      "pegasus.sgconnect.access.token.uri",
+        "scopes_key":         "sgconnect.pegasus.token.scopes"
+      },
+
+      "health_url_key": "pegasus.endpoint.url",
+      "timeout_sec":    10
+    },
+
+    {
+      "name":    "Client Referential (Pegasus)",
+      "aliases": ["client referential", "client ref", "pegasus client"],
+      "team":    "Pegasus Team",
+      "contact": "Reach out to #pegasus-team",
+
+      "auth": {
+        "type":               "oauth2_vault",
+        "client_id_key":      "client.referential.gateway.sgconnect.clientId",
+        "client_secret_key":  "client.referential.gateway.sgconnect.clientSecret",
+        "token_url_key":      "client.referential.gateway.sgconnect.access.token.uri",
+        "scopes_key":         "client.referential.gateway.sgconnect.token.scopes"
+      },
+
+      "health_url_key": "client.referential.gateway.endpoint.url",
+      "timeout_sec":    10
+    },
+
+    {
+      "name":    "ELS / EWS Eligible Positions",
+      "aliases": ["ews", "els", "eligible positions", "ews positions"],
+      "team":    "ELS Team",
+      "contact": "Reach out to ELS team",
+
+      "auth": {
+        "type":               "oauth2_vault",
+        "client_id_key":      "els.get_positions.sgconnect.clientId",
+        "client_secret_key":  "els.get_positions.sgconnect.clientSecret",
+        "token_url_key":      "els.get_positions.sgconnect.access.token.uri",
+        "scopes_key":         "els.get_positions.sgconnect.token.scopes"
+      },
+
+      "health_url_key": "els.get_positions.endpoint.url",
+      "timeout_sec":    12
+    },
+
+    {
+      "name":    "SGConnect (OAuth2 Provider)",
+      "aliases": ["sgconnect", "oauth", "sso", "oauth2"],
+      "team":    "SGConnect / Platform Team",
+      "contact": "Reach out to SGConnect platform team",
+
+      "auth": {
+        "type": "none"
+      },
+
+      "health_url_key": "sgconnect.access.token.uri",
+      "expected_method": "GET",
+      "timeout_sec":     8
+    },
+
+    {
+      "name":    "Socrate Position API",
+      "aliases": ["socrate", "socrate api", "socrate position"],
+      "team":    "Socrate Team",
+      "contact": "Reach out to Socrate team",
+      "type":    "tcp",
+      "host":    "socrateapp-uat.fr.world.socgen",
+      "port":    443
+    },
+
+    {
+      "name":    "Demeter API",
+      "aliases": ["demeter", "demeter api"],
+      "team":    "Demeter Team",
+      "contact": "Reach out to Demeter team",
+      "type":    "tcp",
+      "host":    "spb-api",
+      "port":    443
+    },
+
+    {
+      "name":    "Quasar Naming Service",
+      "aliases": ["quasar", "quasar naming service"],
+      "team":    "Quasar Team",
+      "contact": "Reach out to Quasar team",
+      "type":    "tcp",
+      "host":    "namingserviceuat-ha",
+      "port":    7700
+    },
+
+    {
+      "name":    "SDS Server",
+      "aliases": ["sds", "sds server"],
+      "team":    "SDS Team",
+      "contact": "Reach out to SDS team",
+      "type":    "tcp",
+      "host":    "sdsdevrevproxy01.fr.world.socgen",
+      "port":    8443
+    },
+
+    {
+      "name":    "CANS API Actuator",
+      "aliases": ["cans actuator", "cans health", "cans api swagger", "cans swagger"],
+      "team":    "CANS Team",
+      "contact": "Reach out to CANS team",
+      "type":    "actuator",
+      "health_url_template": "https://capstone-mercury-{env_label}.fr.world.socgen:8190/actuator/health",
+      "timeout_sec":    10
+    }
+  ]
+}
