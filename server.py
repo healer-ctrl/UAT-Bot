@@ -315,8 +315,11 @@ def parse_status(out):
 
 
 def get_pid(out):
-    m = re.search(r'(\d{3,6}) is running', out)
-    return m.group(1) if m else '-'
+    m = re.search(r'(\d{3,6})\s*(is running|MasterThread|NCSAsynchronousProcessor)', out, re.IGNORECASE)
+    if m:
+        return m.group(1)
+    m2 = re.search(r'\b(\d{3,6})\b', out)
+    return m2.group(1) if m2 else '-'
 
 
 # ── Service actions ───────────────────────────────────────────────────────────
@@ -334,11 +337,13 @@ def svc_status(server_key, service):
             state_val = lines[-1] if lines else 'UNKNOWN'
             is_up = 'running' in state_val.lower() and 'not' not in state_val.lower()
             state_str = 'UP' if is_up else 'DOWN'
-            return {'state': '{0} ({1})'.format(state_str, state_val), 'pid': '-'}
+            pid_val = get_pid(out) if is_up else '-'
+            return {'state': '{0} ({1})'.format(state_str, state_val), 'pid': pid_val}
         else:
             count = out.count('MasterThread')
             state = 'UP' if count >= 2 else 'DOWN'
-            return {'state': '{0} ({1}/2 MasterThread)'.format(state, count), 'pid': '-'}
+            pid_val = get_pid(out) if state == 'UP' else '-'
+            return {'state': '{0} ({1}/2 MasterThread)'.format(state, count), 'pid': pid_val}
             
     elif service == 'batch':
         actual_script = sc.get('status_script.batch')
@@ -347,11 +352,13 @@ def svc_status(server_key, service):
             state_val = lines[-1] if lines else 'UNKNOWN'
             is_up = 'running' in state_val.lower() and 'not' not in state_val.lower()
             state_str = 'UP' if is_up else 'DOWN'
-            return {'state': '{0} ({1})'.format(state_str, state_val), 'pid': '-'}
+            pid_val = get_pid(out) if is_up else '-'
+            return {'state': '{0} ({1})'.format(state_str, state_val), 'pid': pid_val}
         else:
             count = out.count('NCSAsynchronousProcessor')
             state = 'UP' if count >= 5 else 'DOWN'
-            return {'state': '{0} ({1}/5 NAP)'.format(state, count), 'pid': '-'}
+            pid_val = get_pid(out) if state == 'UP' else '-'
+            return {'state': '{0} ({1}/5 NAP)'.format(state, count), 'pid': pid_val}
         
     state = parse_status(out)
     return {'state': state, 'pid': get_pid(out) if state == 'UP' else '-'}
