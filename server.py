@@ -688,9 +688,10 @@ def _flow_check_response(flow_key, env_key):
                 'timeout_sec': 5
             }
             act_res = check_api(api_cfg, {}, VAULT._ssl if VAULT else None, server_cfg)
-            actuator_state = act_res.get('state')
-            if actuator_state != 'UP':
-                actuator_err = act_res.get('error')
+            if act_res and isinstance(act_res, dict):
+                actuator_state = act_res.get('state')
+                if actuator_state != 'UP':
+                    actuator_err = act_res.get('error')
 
         is_up = (state == 'UP')
         if svc.lower() == 'wmq-file-integrator' and actuator_state and actuator_state != 'UP':
